@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app.routes.auth import router as auth_router
 
 app = FastAPI(title="MediMind API", version="1.0.0")
 
@@ -14,6 +15,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include authentication routes
+app.include_router(auth_router)
 
 @app.get("/")
 async def root():
