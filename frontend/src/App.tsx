@@ -4,11 +4,15 @@ import {
   Routes,
   Route,
   Navigate,
+  useLocation,
 } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import Header from './components/Header'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
+import Home from './pages/Home'
+import Chat from './pages/Chat'
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
@@ -30,20 +34,32 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
 }
 
 function AppRoutes() {
+  const location = useLocation();
+  const hideHeaderRoutes = ['/login', '/signup'];
+  const shouldShowHeader = !hideHeaderRoutes.includes(location.pathname);
+
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
-      <Route
-        path="/dashboard"
-        element={
+    <>
+      {shouldShowHeader && <Header />}
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/chat" element={
           <ProtectedRoute>
-            <Dashboard />
+            <Chat />
           </ProtectedRoute>
-        }
-      />
-      <Route path="/" element={<Navigate to="/dashboard" />} />
-    </Routes>
+        } />
+      </Routes>
+    </>
   )
 }
 

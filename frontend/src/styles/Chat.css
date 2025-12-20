@@ -1,0 +1,21 @@
+.chat-page {
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  min-height: 100vh;
+  background: var(--soft-white);
+  padding-top: 80px; /* Account for fixed header */
+}
+
+.chat-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.chat-container h1 {
+  color: var(--primary-blue);
+  margin-bottom: 1rem;
+}
+
+.chat-container p {
+  color: var(--text-gray);
+}
