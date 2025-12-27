@@ -4,6 +4,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.routes.auth import router as auth_router
+from app.routes.chat import router as chat_router
 
 app = FastAPI(title="MediMind API", version="1.0.0")
 
@@ -18,6 +19,7 @@ app.add_middleware(
 
 # Include authentication routes
 app.include_router(auth_router)
+app.include_router(chat_router)
 
 @app.get("/")
 async def root():
