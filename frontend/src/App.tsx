@@ -58,6 +58,7 @@ function AppRoutes() {
             <Chat />
           </ProtectedRoute>
         } />
+         <Route path="/" element={<Navigate to="/chat" />} />
       </Routes>
     </>
   )
