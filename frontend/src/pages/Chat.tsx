@@ -6,7 +6,7 @@ import ReactMarkdown from 'react-markdown'
 import './Chat.css'
 
 interface Message {
-  id: number
+  id: number | string
   conversation_id: number
   role: string
   content: string
@@ -91,22 +91,68 @@ const Chat: React.FC = () => {
     // Show typing indicator
     setLoading(true)
 
+    // Create temp ID for assistant message
+    const tempAssistantId = `temp-${Date.now()}`
+
     try {
       const response = await chatService.sendMessage(
         messageContent,
-        currentConversation?.id
+        currentConversation?.id,
+        {
+          // When metadata arrives, create placeholder assistant message
+          onMetadata: (metadata) => {
+            setMessages((prev) => {
+              // Replace temp user message with real one
+              const withoutTempUser = prev.filter((msg) => msg.id !== tempUserMessage.id)
+
+              // Add real user message and empty assistant message
+              return [
+                ...withoutTempUser,
+                {
+                  id: metadata.user_message_id,
+                  conversation_id: metadata.conversation_id,
+                  role: 'user',
+                  content: messageContent,
+                  created_at: new Date().toISOString(),
+                },
+                {
+                  id: tempAssistantId,
+                  conversation_id: metadata.conversation_id,
+                  role: 'assistant',
+                  content: '',
+                  created_at: new Date().toISOString(),
+                }
+              ]
+            })
+            // Hide typing indicator when streaming starts
+            setLoading(false)
+          },
+
+          // Update assistant message as chunks arrive
+          onChunk: (chunk) => {
+            setMessages((prev) => {
+              const updated = [...prev]
+              const assistantMsgIndex = updated.findIndex(msg => msg.id === tempAssistantId)
+              if (assistantMsgIndex !== -1) {
+                updated[assistantMsgIndex] = {
+                  ...updated[assistantMsgIndex],
+                  content: updated[assistantMsgIndex].content + chunk
+                }
+              }
+              return updated
+            })
+          }
+        }
       )
 
-      // Replace temp message with real messages from server
+      // Replace temp assistant message with final one
       setMessages((prev) => {
-        // Remove the temporary message
-        const withoutTemp = prev.filter((msg) => msg.id !== tempUserMessage.id)
-        // Add real messages from server
-        return [
-          ...withoutTemp,
-          response.user_message,
-          response.assistant_message,
-        ]
+        const updated = [...prev]
+        const assistantMsgIndex = updated.findIndex(msg => msg.id === tempAssistantId)
+        if (assistantMsgIndex !== -1) {
+          updated[assistantMsgIndex] = response.assistant_message
+        }
+        return updated
       })
 
       // Update current conversation
@@ -117,8 +163,8 @@ const Chat: React.FC = () => {
     } catch (error) {
       console.error('Failed to send message:', error)
 
-      // Remove the temporary message on error
-      setMessages((prev) => prev.filter((msg) => msg.id !== tempUserMessage.id))
+      // Remove the temporary messages on error
+      setMessages((prev) => prev.filter((msg) => msg.id !== tempUserMessage.id && msg.id !== tempAssistantId))
 
       alert('Failed to send message. Please try again.')
     } finally {

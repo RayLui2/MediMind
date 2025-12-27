@@ -26,22 +26,115 @@ interface ChatResponse {
   conversation: Conversation;
 }
 
+interface StreamCallbacks {
+  onChunk?: (chunk: string) => void;
+  onMetadata?: (metadata: { conversation_id: number; user_message_id: number }) => void;
+}
+
 class ChatService {
-  // Send a message
-  async sendMessage(content: string, conversationId?: number): Promise<ChatResponse> {
+  // Send a message with streaming support
+  async sendMessage(
+    content: string,
+    conversationId?: number,
+    callbacks?: StreamCallbacks
+  ): Promise<ChatResponse> {
     const token = authService.getToken();
-    
-    const response = await axios.post(
-      `${API_URL}/chat/send${conversationId ? `?conversation_id=${conversationId}` : ''}`,
-      { content },
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`
+    const url = `${API_URL}/chat/stream${conversationId ? `?conversation_id=${conversationId}` : ''}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ content })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('No response body');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let metadata: any = null;
+    let fullText = '';
+    let assistantMessageId: number | null = null;
+
+    // Read stream
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+
+            if (data.type === 'metadata') {
+              metadata = data;
+              console.log('📦 Metadata received:', data);
+              if (callbacks?.onMetadata) {
+                callbacks.onMetadata({
+                  conversation_id: data.conversation_id,
+                  user_message_id: data.user_message_id
+                });
+              }
+            } else if (data.type === 'chunk') {
+              console.log('📨 Chunk received:', data.text);
+              fullText += data.text;
+              if (callbacks?.onChunk) {
+                callbacks.onChunk(data.text);
+              }
+            } else if (data.type === 'complete') {
+              console.log('✅ Stream complete, message ID:', data.assistant_message_id);
+              assistantMessageId = data.assistant_message_id;
+            } else if (data.type === 'error') {
+              throw new Error(data.message);
+            }
+          } catch (e) {
+            console.error('Error parsing SSE data:', e);
+          }
         }
       }
-    );
-    
-    return response.data;
+    }
+
+    if (!metadata || assistantMessageId === null) {
+      throw new Error('Invalid stream response');
+    }
+
+    // Build response in same format as before
+    return {
+      user_message: {
+        id: metadata.user_message_id,
+        conversation_id: metadata.conversation_id,
+        role: 'user',
+        content: content,
+        created_at: new Date().toISOString()
+      },
+      assistant_message: {
+        id: assistantMessageId,
+        conversation_id: metadata.conversation_id,
+        role: 'assistant',
+        content: fullText,
+        created_at: new Date().toISOString()
+      },
+      conversation: {
+        id: metadata.conversation_id,
+        user_id: 0, // Will be updated from backend if needed
+        title: content.substring(0, 50),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    };
   }
 
   // Get all conversations
