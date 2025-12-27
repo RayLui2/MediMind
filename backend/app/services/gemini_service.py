@@ -24,26 +24,6 @@ class GeminiService:
         """
 
         try:
-#             if conversation_history:
-#                 context = self.format_conversation_history(conversation_history)
-#                 full_message = f"{context}\n\nUser: {message}"
-#             else:
-#                 full_message = message
-            
-#             # Add system message for health context
-#             system_context = """You are MediMind, a helpful AI health assistant. 
-# You provide general health information and advice, but always remind users 
-# that you are not a replacement for professional medical care. Be empathetic, 
-# clear, and helpful while being medically responsible."""
-
-#             full_prompt = f"{system_context}\n\n{full_message}"
-            
-#             # Generate response
-#             response = self.client.models.generate_content(
-#                 model=self.model,
-#                 contents=full_prompt
-#             )
-
             if conversation_history:
                 context = self.format_conversation_history(conversation_history)
                 full_message = f"{context}\n\nUser: {message}"
