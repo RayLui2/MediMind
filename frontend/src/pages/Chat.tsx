@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import chatService from '../services/chatService'
+import ReactMarkdown from 'react-markdown'
 import './Chat.css'
 
 interface Message {
@@ -293,7 +294,13 @@ const Chat: React.FC = () => {
                     : user?.name?.charAt(0) || 'U'}
                 </div>
                 <div>
-                  <div className="chat-message-content">{message.content}</div>
+                  <div className="chat-message-content">
+                    {message.role === 'assistant' ? (
+                      <ReactMarkdown>{message.content}</ReactMarkdown>
+                    ) : (
+                      message.content
+                    )}
+                  </div>
                   <div className="chat-message-time">
                     {formatTime(message.created_at)}
                   </div>
