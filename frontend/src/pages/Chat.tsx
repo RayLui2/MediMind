@@ -193,25 +193,6 @@ const Chat: React.FC = () => {
 
   return (
     <div className="chat-page">
-      <div className="chat-top-nav">
-        <div className="chat-logo">
-          <div className="chat-logo-icon">M</div>
-          MediMind
-        </div>
-        <div className="chat-nav-items">
-          <a href="/dashboard">Dashboard</a>
-          <a href="/chat" className="active">
-            Chat
-          </a>
-          <div className="chat-user-profile" onClick={handleLogout}>
-            <div className="chat-user-avatar">
-              {user?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
-            </div>
-            <span>{user?.name || 'User'}</span>
-          </div>
-        </div>
-      </div>
-
       <div className="chat-main-container">
         <div className="chat-sidebar">
           <div className="chat-sidebar-header">
