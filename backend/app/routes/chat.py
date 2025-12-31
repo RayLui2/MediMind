@@ -1,4 +1,5 @@
 import json
+import os
 from assistant.system_prompt import system_prompt
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from assistant.chat import assistant_graph
@@ -199,7 +200,7 @@ async def stream_chat_message(
         }
         yield f"data: {json.dumps(metadata)}\n\n"
 
-        # Prepare state for LangGraoh
+        # Prepare messages for LLM
         messages = []
 
         # Load history from DB
@@ -217,33 +218,56 @@ async def stream_chat_message(
                     messages.append(AIMessage(content=msg.content))
         else:
             messages.append(SystemMessage(content=system_prompt))
-        
-        messages.append(HumanMessage(content=message.content))
 
-        # Build state
-        state = {
-            "messages": messages,
-            "conversation_id": conversation.id,
-            "user_id": user.id,
-            "user_data": {
-                "name": user.name,
-                "age": user.age
-            } if user.name or user.age else None,
-            "chat_history": []
-        }
+        # Add user info to current message if available
+        if user.name or user.age:
+            enhanced_content = f"""
+User information:
+- Name: {user.name if user.name else 'Unknown'}
+- Age: {user.age if user.age else 'Unknown'}
 
-        # Stream from graph
-        for chunk in assistant_graph.stream(state):
-            if "chatbot" in chunk:
-                chatbot_output = chunk["chatbot"]
-                if "messages" in chatbot_output and chatbot_output["messages"]:
-                    ai_message = chatbot_output["messages"][-1]
-                    if hasattr(ai_message, 'content'):
-                        full_response = ai_message.content
+User message:
+{message.content}
+"""
+            messages.append(HumanMessage(content=enhanced_content))
+        else:
+            messages.append(HumanMessage(content=message.content))
 
-        # Yeild complete response as chunk
-        chunk_data = {"type": "chunk", "text": full_response}
-        yield f"data: {json.dumps(chunk_data)}\n\n"
+        # Stream directly from LLM (bypass LangGraph for streaming)
+        try:
+            # Initialize LLM
+            from langchain.chat_models import init_chat_model
+            llm = init_chat_model(
+                os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+                model_provider="google_genai",
+                api_key=os.getenv("GEMINI_API_KEY"),
+                temperature=0.2,
+            )
+
+            # Stream tokens from LLM
+            chunk_count = 0
+            for chunk in llm.stream(messages):
+                if hasattr(chunk, 'content') and chunk.content:
+                    token = chunk.content
+                    full_response += token
+                    chunk_count += 1
+
+                    # Debug: Log chunk info
+                    print(f"Chunk {chunk_count}: '{token[:50]}...' (length: {len(token)})")
+
+                    # Yield each token immediately as SSE chunk
+                    chunk_data = {"type": "chunk", "text": token}
+                    yield f"data: {json.dumps(chunk_data)}\n\n"
+
+            print(f"Total chunks streamed: {chunk_count}")
+
+        except Exception as e:
+            print(f"Error in streaming: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            error_data = {"type": "error", "message": str(e)}
+            yield f"data: {json.dumps(error_data)}\n\n"
+            return
 
         # Save assistant response
         assistant_message = Message(

@@ -34,7 +34,15 @@ User message:\n{original_content}
 
             messages[-1] = enhanced_content
 
-        response = llm.invoke(messages)
+        # Stream tokens from LLM and accumulate full response
+        full_content = ""
+        for chunk in llm.stream(messages):
+            if hasattr(chunk, 'content') and chunk.content:
+                full_content += chunk.content
+
+        # Create complete AIMessage for state management
+        from langchain_core.messages import AIMessage
+        response = AIMessage(content=full_content)
 
         return {"messages": [response], "chat_history": [ChatMessage(role="assistant", content=response.content)]}
 
