@@ -1,4 +1,7 @@
 import json
+from assistant.system_prompt import system_prompt
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+from assistant.chat import assistant_graph
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
@@ -196,43 +199,113 @@ async def stream_chat_message(
         }
         yield f"data: {json.dumps(metadata)}\n\n"
 
-        # Stream the AI response chunks
-        try:
-            for chunk in gemini_service.generate_response_stream(
-                message.content,
-                conversation_history
-            ):
-                full_response += chunk
-                data = {"type": "chunk", "text": chunk}
-                yield f"data: {json.dumps(data)}\n\n"
+        # Prepare state for LangGraoh
+        messages = []
 
-            # Save complete AI response to database
-            assistant_message = Message(
-                conversation_id=conversation.id,
-                role="assistant",
-                content=full_response
-            )
-            db.add(assistant_message)
-            db.commit()
-            db.refresh(assistant_message)
+        # Load history from DB
+        db_messages = db.query(Message).filter(
+            Message.conversation_id == conversation.id
+        ).order_by(Message.created_at.desc()).limit(10).all()
 
-            # Update conversation updated_at timestamp
-            conversation.updated_at = assistant_message.created_at
-            db.commit()
+        db_messages = list(reversed(db_messages))
 
-            # Send completion event with assistant message ID
-            completion_data = {
-                "type": "complete",
-                "assistant_message_id": assistant_message.id
-            }
-            yield f"data: {json.dumps(completion_data)}\n\n"
+        if db_messages:
+            for msg in db_messages:
+                if msg.role == "user":
+                    messages.append(HumanMessage(content=msg.content))
+                elif msg.role == "assistant":
+                    messages.append(AIMessage(content=msg.content))
+        else:
+            messages.append(SystemMessage(content=system_prompt))
+        
+        messages.append(HumanMessage(content=message.content))
 
-        except Exception as e:
-            error_data = {
-                "type": "error",
-                "message": str(e)
-            }
-            yield f"data: {json.dumps(error_data)}\n\n"
+        # Build state
+        state = {
+            "messages": messages,
+            "conversation_id": conversation.id,
+            "user_id": user.id,
+            "user_data": {
+                "name": user.name,
+                "age": user.age
+            } if user.name or user.age else None,
+            "chat_history": []
+        }
+
+        # Stream from graph
+        for chunk in assistant_graph.stream(state):
+            if "chatbot" in chunk:
+                chatbot_output = chunk["chatbot"]
+                if "messages" in chatbot_output and chatbot_output["messages"]:
+                    ai_message = chatbot_output["messages"][-1]
+                    if hasattr(ai_message, 'content'):
+                        full_response = ai_message.content
+
+        # Yeild complete response as chunk
+        chunk_data = {"type": "chunk", "text": full_response}
+        yield f"data: {json.dumps(chunk_data)}\n\n"
+
+        # Save assistant response
+        assistant_message = Message(
+            conversation_id=conversation.id,
+            role="assistant",
+            content=full_response
+        )
+        db.add(assistant_message)
+
+        if conversation.title == "New Chat":
+            conversation.title = message.content[:50]
+
+        db.commit()
+        db.refresh(assistant_message)
+
+        # Send completion
+        completion_data = {
+            "type": "complete",
+            "assistant_message_id": assistant_message.id
+        }
+        yield f"data: {json.dumps(completion_data)}\n\n"
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+
+        # # Stream the AI response chunks
+        # try:
+        #     for chunk in gemini_service.generate_response_stream(
+        #         message.content,
+        #         conversation_history
+        #     ):
+        #         full_response += chunk
+        #         data = {"type": "chunk", "text": chunk}
+        #         yield f"data: {json.dumps(data)}\n\n"
+
+        #     # Save complete AI response to database
+        #     assistant_message = Message(
+        #         conversation_id=conversation.id,
+        #         role="assistant",
+        #         content=full_response
+        #     )
+        #     db.add(assistant_message)
+        #     db.commit()
+        #     db.refresh(assistant_message)
+
+        #     # Update conversation updated_at timestamp
+        #     conversation.updated_at = assistant_message.created_at
+        #     db.commit()
+
+        #     # Send completion event with assistant message ID
+        #     completion_data = {
+        #         "type": "complete",
+        #         "assistant_message_id": assistant_message.id
+        #     }
+        #     yield f"data: {json.dumps(completion_data)}\n\n"
+
+        # except Exception as e:
+        #     error_data = {
+        #         "type": "error",
+        #         "message": str(e)
+        #     }
+        #     yield f"data: {json.dumps(error_data)}\n\n"
 
     return StreamingResponse(
         event_generator(),
