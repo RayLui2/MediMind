@@ -1,0 +1,1 @@
+# Create a safety node that can be used in a LangGraph graph.
