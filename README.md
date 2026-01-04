@@ -21,11 +21,13 @@ AI-powered healthcare assistant for personal health tracking and medical guidanc
 
 ## Overview
 
-MediMind is a full-stack healthcare application that provides:
-- AI-powered medical chat assistance using Google's Gemini AI
-- User authentication and secure health data management
-- Personal health dashboard with data visualization
-- Conversation history tracking and management
+MediMind is a comprehensive full-stack healthcare application that empowers users to take control of their health through:
+- **AI-Powered Medical Assistant**: Conversational medical guidance using Google's Gemini AI
+- **Health Monitoring Dashboard**: Track vital signs, symptoms, and health metrics with interactive visualizations
+- **Medication Management**: Never miss a dose with smart medication tracking and reminders
+- **Symptom Logging**: Monitor and track symptoms over time to identify patterns
+- **Personalized Insights**: Receive AI-driven health recommendations based on your data
+- **Secure Health Records**: User authentication and encrypted health data management
 
 ## Features
 
@@ -33,15 +35,21 @@ MediMind is a full-stack healthcare application that provides:
 - **User Authentication**: Secure signup and login with JWT-based authentication
 - **AI Chat Interface**: Interactive chat with AI medical assistant powered by Gemini
 - **Conversation History**: Save and retrieve past medical conversations
-- **Health Dashboard**: Personal health data visualization and tracking
+- **Health Dashboard**: Personal health data visualization and tracking with interactive charts
+- **Health Metrics Tracking**: Monitor vital signs including blood pressure, heart rate, and weight
+- **Symptom Tracker**: Log and track symptoms with severity levels and timestamps
+- **Medication Management**: Track medications with reminders, schedules, and daily check-offs
+- **Health Profile**: Manage current conditions, allergies, and family history
+- **Health Calculators**: Built-in BMI, BMR, water intake, and health risk calculators
+- **AI Recommendations**: Personalized health insights and recommendations
 - **Responsive Design**: Modern, mobile-friendly UI built with React
 
 ### Planned Features
-- Health metrics tracking (blood pressure, glucose, weight, etc.)
-- Medication reminders and management
-- Appointment scheduling
-- Health reports generation
+- Appointment scheduling and calendar integration
+- Health reports generation and export
+- Advanced analytics and trend predictions
 - Multi-language support
+- Integration with wearable devices and health apps
 
 ## Tech Stack
 
