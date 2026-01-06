@@ -2,7 +2,6 @@ import json
 import os
 from assistant.system_prompt import system_prompt
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
-from assistant.chat import assistant_graph
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
@@ -11,14 +10,12 @@ from app.models.user import User
 from app.models.conversations import Conversation
 from app.models.message import Message
 from app.schemas.chat import (
-    MessageCreate, 
-    ChatResponse, 
-    ConversationResponse, 
+    MessageCreate,
+    ConversationResponse,
     ConversationWithMessages,
     MessageResponse
 )
 from app.utils.security import verify_token
-from app.services.gemini_service import gemini_service
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -48,88 +45,6 @@ def get_current_user(
     
     return user
 
-
-@router.post("/send", response_model=ChatResponse)
-def send_message(
-    message: MessageCreate,
-    conversation_id: int = None,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Send a message and get AI response.
-    
-    If conversation_id is provided, adds to existing conversation.
-    Otherwise, creates a new conversation.
-    """
-    # Get or create conversation
-    if conversation_id:
-        conversation = db.query(Conversation).filter(
-            Conversation.id == conversation_id,
-            Conversation.user_id == user.id
-        ).first()
-        
-        if not conversation:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Conversation not found"
-            )
-    else:
-        # Create new conversation
-        conversation = Conversation(
-            user_id=user.id,
-            title=message.content[:50] + "..." if len(message.content) > 50 else message.content
-        )
-        db.add(conversation)
-        db.commit()
-        db.refresh(conversation)
-    
-    # Save user message
-    user_message = Message(
-        conversation_id=conversation.id,
-        role="user",
-        content=message.content
-    )
-    db.add(user_message)
-    db.commit()
-    db.refresh(user_message)
-    
-    # Get conversation history for context
-    previous_messages = db.query(Message).filter(
-        Message.conversation_id == conversation.id
-    ).order_by(Message.created_at).all()
-    
-    conversation_history = [
-        {"role": msg.role, "content": msg.content}
-        for msg in previous_messages[:-1]  # Exclude the message we just added
-    ]
-    
-    # Generate AI response
-    ai_response_text = gemini_service.generate_response(
-        message.content,
-        conversation_history
-    )
-    
-    # Save AI response
-    assistant_message = Message(
-        conversation_id=conversation.id,
-        role="assistant",
-        content=ai_response_text
-    )
-    db.add(assistant_message)
-    db.commit()
-    db.refresh(assistant_message)
-    
-    # Update conversation updated_at timestamp
-    conversation.updated_at = assistant_message.created_at
-    db.commit()
-    db.refresh(conversation)
-    
-    return ChatResponse(
-        user_message=user_message,
-        assistant_message=assistant_message,
-        conversation=conversation
-    )
 
 @router.post("/stream")
 async def stream_chat_message(
@@ -162,7 +77,6 @@ async def stream_chat_message(
         # Create new conversation
         conversation = Conversation(
             user_id=user.id,
-            title=message.content[:50] + "..." if len(message.content) > 50 else message.content
         )
         db.add(conversation)
         db.commit()
@@ -178,21 +92,38 @@ async def stream_chat_message(
     db.commit()
     db.refresh(user_message)
 
-    # Get conversation history for context
-    previous_messages = db.query(Message).filter(
-        Message.conversation_id == conversation.id
-    ).order_by(Message.created_at).all()
+    # Generate title using LangGraph summarizer for new conversations
+    if not conversation_id and conversation.title != "New Conversation":  # Only for new conversations
+        try:
+            from assistant.chat import assistant_graph
 
-    conversation_history = [
-        {"role": msg.role, "content": msg.content}
-        for msg in previous_messages[:-1]  # Exclude the message we just added
-    ]
+            config = {"configurable": {"thread_id": f"conversation_{conversation.id}"}}
+
+            # Run just the summarizer node to get the title
+            result = assistant_graph.invoke({
+                "messages": [SystemMessage(content=system_prompt), HumanMessage(content=message.content)],
+            }, config=config)
+
+            # Extract summary from result
+            if result.get("summary"):
+                conversation.title = result["summary"]
+            db.commit()
+            db.refresh(conversation)
+            print(f"Updated title from message: {conversation.title}", flush=True)
+
+        except Exception as e:
+            print(f"Error generating title with LangGraph: {str(e)}", flush=True)
+            import traceback
+            traceback.print_exc()
 
     # Create async generator for SSE format
     async def event_generator():
         full_response = ""
 
-        # Send conversation metadata first
+        # Refresh conversation to get updated title
+        db.refresh(conversation)
+
+        # Send conversation metadata first (with updated title)
         metadata = {
             "type": "metadata",
             "conversation_id": conversation.id,
@@ -247,6 +178,8 @@ User message:
 
             # Stream tokens from LLM
             chunk_count = 0
+            import asyncio
+
             for chunk in llm.stream(messages):
                 if hasattr(chunk, 'content') and chunk.content:
                     token = chunk.content
@@ -254,13 +187,16 @@ User message:
                     chunk_count += 1
 
                     # Debug: Log chunk info
-                    print(f"Chunk {chunk_count}: '{token[:50]}...' (length: {len(token)})")
+                    print(f"Chunk {chunk_count}: '{token[:50]}...' (length: {len(token)})", flush=True)
 
                     # Yield each token immediately as SSE chunk
                     chunk_data = {"type": "chunk", "text": token}
                     yield f"data: {json.dumps(chunk_data)}\n\n"
 
-            print(f"Total chunks streamed: {chunk_count}")
+                    # Force async yield to prevent buffering
+                    await asyncio.sleep(0)
+
+            print(f"Total chunks streamed: {chunk_count}", flush=True)
 
         except Exception as e:
             print(f"Error in streaming: {str(e)}")
@@ -287,61 +223,21 @@ User message:
         # Send completion
         completion_data = {
             "type": "complete",
-            "assistant_message_id": assistant_message.id
+            "assistant_message_id": assistant_message.id,
+            "conversation_id": conversation.id,
+            "conversation_title": conversation.title
         }
         yield f"data: {json.dumps(completion_data)}\n\n"
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
-
-
-
-        # # Stream the AI response chunks
-        # try:
-        #     for chunk in gemini_service.generate_response_stream(
-        #         message.content,
-        #         conversation_history
-        #     ):
-        #         full_response += chunk
-        #         data = {"type": "chunk", "text": chunk}
-        #         yield f"data: {json.dumps(data)}\n\n"
-
-        #     # Save complete AI response to database
-        #     assistant_message = Message(
-        #         conversation_id=conversation.id,
-        #         role="assistant",
-        #         content=full_response
-        #     )
-        #     db.add(assistant_message)
-        #     db.commit()
-        #     db.refresh(assistant_message)
-
-        #     # Update conversation updated_at timestamp
-        #     conversation.updated_at = assistant_message.created_at
-        #     db.commit()
-
-        #     # Send completion event with assistant message ID
-        #     completion_data = {
-        #         "type": "complete",
-        #         "assistant_message_id": assistant_message.id
-        #     }
-        #     yield f"data: {json.dumps(completion_data)}\n\n"
-
-        # except Exception as e:
-        #     error_data = {
-        #         "type": "error",
-        #         "message": str(e)
-        #     }
-        #     yield f"data: {json.dumps(error_data)}\n\n"
-
     return StreamingResponse(
-        event_generator(),
+        event_generator(), 
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
         }
     )
-
-
+    
 
 @router.get("/conversations", response_model=List[ConversationResponse])
 def get_conversations(

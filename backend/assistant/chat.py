@@ -11,6 +11,7 @@ from langgraph.checkpoint.postgres import PostgresSaver
 # Local imports
 from assistant.models.chat import ChatMessage
 from assistant.nodes.chatbot import create_chatbot_node
+from assistant.nodes.summarizer import create_summarizer_node
 from assistant.state import State
 from assistant.system_prompt import system_prompt
 from app.models.conversations import Conversation
@@ -24,18 +25,24 @@ assistant_graph_builder = StateGraph(State)
 
 # --- Create Nodes ---
 chatbot_node = create_chatbot_node()
+summarizer_node = create_summarizer_node()
 
 # --- Add Nodes ---
 assistant_graph_builder.add_node("chatbot", chatbot_node)
-
+assistant_graph_builder.add_node("summarizer", summarizer_node)
 
 # --- Set Entry Point ---
-assistant_graph_builder.set_entry_point("chatbot")# --- Add Edges ---
-# Optional: Add conditional edges for tool use
+assistant_graph_builder.set_entry_point("summarizer")
 
+# --- Add Edges ---
+# Summarizer always goes to chatbot after generating summary
+assistant_graph_builder.add_edge("summarizer", "chatbot")
+
+# Chatbot goes to END
 assistant_graph_builder.add_edge("chatbot", END)
 
 
+### Currently not used - might be used in the future ###
 def call_assistant(assistant_graph: StateGraph, conversation: Conversation, user_msg: str, db) -> Generator[Dict[str, Any], None, None]:
     if not user_msg:
         raise ValueError("User message is required.")
@@ -72,7 +79,6 @@ def call_assistant(assistant_graph: StateGraph, conversation: Conversation, user
 
     # Add the user message
     messages.append(HumanMessage(user_msg))
-
 
     # Add the chat history
     chat_history = [ChatMessage(role="user", content=user_msg)]
