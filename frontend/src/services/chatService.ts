@@ -28,7 +28,7 @@ interface ChatResponse {
 
 interface StreamCallbacks {
   onChunk?: (chunk: string) => void;
-  onMetadata?: (metadata: { conversation_id: number; user_message_id: number }) => void;
+  onMetadata?: (metadata: { conversation_id: number; user_message_id: number; conversation_title: string }) => void;
 }
 
 class ChatService {
@@ -85,7 +85,8 @@ class ChatService {
               if (callbacks?.onMetadata) {
                 callbacks.onMetadata({
                   conversation_id: data.conversation_id,
-                  user_message_id: data.user_message_id
+                  user_message_id: data.user_message_id,
+                  conversation_title: data.conversation_title
                 });
               }
             } else if (data.type === 'chunk') {
@@ -130,7 +131,7 @@ class ChatService {
       conversation: {
         id: metadata.conversation_id,
         user_id: 0, // Will be updated from backend if needed
-        title: content.substring(0, 50),
+        title: metadata.conversation_title,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }

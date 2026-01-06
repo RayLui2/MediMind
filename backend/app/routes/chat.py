@@ -196,7 +196,8 @@ async def stream_chat_message(
         metadata = {
             "type": "metadata",
             "conversation_id": conversation.id,
-            "user_message_id": user_message.id
+            "user_message_id": user_message.id,
+            "conversation_title": conversation.title
         }
         yield f"data: {json.dumps(metadata)}\n\n"
 

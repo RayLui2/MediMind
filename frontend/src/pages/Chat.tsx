@@ -103,7 +103,9 @@ const Chat: React.FC = () => {
           onMetadata: (metadata) => {
             setMessages((prev) => {
               // Replace temp user message with real one
-              const withoutTempUser = prev.filter((msg) => msg.id !== tempUserMessage.id)
+              const withoutTempUser = prev.filter(
+                (msg) => msg.id !== tempUserMessage.id
+              )
 
               // Add real user message and empty assistant message
               return [
@@ -121,7 +123,7 @@ const Chat: React.FC = () => {
                   role: 'assistant',
                   content: '',
                   created_at: new Date().toISOString(),
-                }
+                },
               ]
             })
             // Hide typing indicator when streaming starts
@@ -132,23 +134,27 @@ const Chat: React.FC = () => {
           onChunk: (chunk) => {
             setMessages((prev) => {
               const updated = [...prev]
-              const assistantMsgIndex = updated.findIndex(msg => msg.id === tempAssistantId)
+              const assistantMsgIndex = updated.findIndex(
+                (msg) => msg.id === tempAssistantId
+              )
               if (assistantMsgIndex !== -1) {
                 updated[assistantMsgIndex] = {
                   ...updated[assistantMsgIndex],
-                  content: updated[assistantMsgIndex].content + chunk
+                  content: updated[assistantMsgIndex].content + chunk,
                 }
               }
               return updated
             })
-          }
+          },
         }
       )
 
       // Replace temp assistant message with final one
       setMessages((prev) => {
         const updated = [...prev]
-        const assistantMsgIndex = updated.findIndex(msg => msg.id === tempAssistantId)
+        const assistantMsgIndex = updated.findIndex(
+          (msg) => msg.id === tempAssistantId
+        )
         if (assistantMsgIndex !== -1) {
           updated[assistantMsgIndex] = response.assistant_message
         }
@@ -164,7 +170,11 @@ const Chat: React.FC = () => {
       console.error('Failed to send message:', error)
 
       // Remove the temporary messages on error
-      setMessages((prev) => prev.filter((msg) => msg.id !== tempUserMessage.id && msg.id !== tempAssistantId))
+      setMessages((prev) =>
+        prev.filter(
+          (msg) => msg.id !== tempUserMessage.id && msg.id !== tempAssistantId
+        )
+      )
 
       alert('Failed to send message. Please try again.')
     } finally {

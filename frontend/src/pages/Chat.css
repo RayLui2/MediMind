@@ -20,6 +20,7 @@
   height: 100vh;
   display: flex;
   flex-direction: column;
+  padding-top: 80px; /* Account for fixed global header */
 }
 
 /* Top Navigation */
@@ -108,7 +109,7 @@
 /* Main Container */
 .chat-main-container {
   display: flex;
-  height: calc(100vh - 70px);
+  height: calc(100vh - 80px);
   overflow: hidden;
 }
 
