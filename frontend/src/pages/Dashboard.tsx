@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Chart, registerables } from 'chart.js';
 import '../styles/Dashboard.css';
+import * as dashboardService from '../services/dashboardService';
 
 Chart.register(...registerables);
 
@@ -10,105 +11,316 @@ const Dashboard: React.FC = () => {
   const chartRef = useRef<HTMLCanvasElement>(null);
   const chartInstanceRef = useRef<Chart | null>(null);
 
+  // Data states
+  const [summary, setSummary] = useState<dashboardService.DashboardSummary | null>(null);
+  const [medications, setMedications] = useState<dashboardService.Medication[]>([]);
+  const [symptoms, setSymptoms] = useState<dashboardService.Symptom[]>([]);
+  const [vitalSigns, setVitalSigns] = useState<dashboardService.VitalSign[]>([]);
+  const [healthProfile, setHealthProfile] = useState<dashboardService.HealthProfile | null>(null);
+  const [medicationsTakenToday, setMedicationsTakenToday] = useState<Set<number>>(new Set());
+
   // Modal states
   const [symptomModalOpen, setSymptomModalOpen] = useState(false);
   const [medicationModalOpen, setMedicationModalOpen] = useState(false);
+  const [vitalSignModalOpen, setVitalSignModalOpen] = useState(false);
+  const [healthProfileModalOpen, setHealthProfileModalOpen] = useState(false);
+
+  // Form states for symptom modal
+  const [symptomType, setSymptomType] = useState('');
   const [severityValue, setSeverityValue] = useState(5);
+  const [symptomNotes, setSymptomNotes] = useState('');
 
-  // Medication check states
-  const [medicationChecks, setMedicationChecks] = useState([true, true, false]);
+  // Form states for medication modal
+  const [medicationName, setMedicationName] = useState('');
+  const [medicationFrequency, setMedicationFrequency] = useState('');
+  const [medicationTime, setMedicationTime] = useState('');
+  const [medicationNotes, setMedicationNotes] = useState('');
 
-  // Initialize Chart
-  useEffect(() => {
-    if (chartRef.current) {
-      const ctx = chartRef.current.getContext('2d');
-      if (ctx) {
-        // Destroy existing chart if it exists
-        if (chartInstanceRef.current) {
-          chartInstanceRef.current.destroy();
+  // Form states for vital sign modal
+  const [systolicBP, setSystolicBP] = useState('');
+  const [diastolicBP, setDiastolicBP] = useState('');
+  const [heartRate, setHeartRate] = useState('');
+  const [weight, setWeight] = useState('');
+
+  // Form states for health profile modal
+  const [profileWeight, setProfileWeight] = useState('');
+  const [profileHeight, setProfileHeight] = useState('');
+  const [profileConditions, setProfileConditions] = useState('');
+  const [profileAllergies, setProfileAllergies] = useState('');
+  const [profileFamilyHistory, setProfileFamilyHistory] = useState('');
+
+  // Loading state
+  const [loading, setLoading] = useState(true);
+
+  // Fetch all dashboard data
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const [summaryData, medsData, symptomsData, vitalsData, takenToday] = await Promise.all([
+        dashboardService.getDashboardSummary(),
+        dashboardService.getMedications(),
+        dashboardService.getSymptoms(30),
+        dashboardService.getVitalSigns(7),
+        dashboardService.getTodaysMedicationLogs(),
+      ]);
+
+      setSummary(summaryData);
+      setMedications(medsData);
+      setSymptoms(symptomsData);
+      setVitalSigns(vitalsData);
+      setMedicationsTakenToday(new Set(takenToday));
+
+      // Try to fetch health profile
+      try {
+        const profileData = await dashboardService.getHealthProfile();
+        setHealthProfile(profileData);
+      } catch (error: any) {
+        if (error.response?.status === 404) {
+          // No health profile yet - that's okay
+          setHealthProfile(null);
         }
-
-        chartInstanceRef.current = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-            datasets: [
-              {
-                label: 'Systolic BP',
-                data: [125, 122, 118, 120, 118, 117, 118],
-                borderColor: '#2E5EAA',
-                backgroundColor: 'rgba(46, 94, 170, 0.1)',
-                tension: 0.4,
-                fill: true,
-              },
-              {
-                label: 'Heart Rate',
-                data: [72, 75, 70, 73, 71, 69, 72],
-                borderColor: '#5DD3C6',
-                backgroundColor: 'rgba(93, 211, 198, 0.1)',
-                tension: 0.4,
-                fill: true,
-              },
-            ],
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                position: 'bottom',
-              },
-            },
-            scales: {
-              y: {
-                beginAtZero: false,
-              },
-            },
-          },
-        });
       }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  // Initialize Chart with real data
+  useEffect(() => {
+    if (!loading && chartRef.current && vitalSigns.length > 0) {
+      // Small delay to ensure canvas is fully mounted
+      const timeout = setTimeout(() => {
+        if (!chartRef.current) return;
+
+        const ctx = chartRef.current.getContext('2d');
+        if (ctx) {
+          if (chartInstanceRef.current) {
+            chartInstanceRef.current.destroy();
+          }
+
+          // Get last 7 vital signs
+          const last7Vitals = vitalSigns.slice(0, 7).reverse();
+          const labels = last7Vitals.map((v) => {
+            const date = new Date(v.recorded_at);
+            return date.toLocaleDateString('en-US', { weekday: 'short' });
+          });
+          const systolicData = last7Vitals.map((v) => v.systolic_bp || null);
+          const heartRateData = last7Vitals.map((v) => v.heart_rate || null);
+
+          chartInstanceRef.current = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels,
+              datasets: [
+                {
+                  label: 'Systolic BP',
+                  data: systolicData,
+                  borderColor: '#2E5EAA',
+                  backgroundColor: 'rgba(46, 94, 170, 0.1)',
+                  tension: 0.4,
+                  fill: true,
+                },
+                {
+                  label: 'Heart Rate',
+                  data: heartRateData,
+                  borderColor: '#5DD3C6',
+                  backgroundColor: 'rgba(93, 211, 198, 0.1)',
+                  tension: 0.4,
+                  fill: true,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                },
+              },
+              scales: {
+                y: {
+                  beginAtZero: false,
+                },
+              },
+            },
+          });
+        }
+      }, 100);
+
+      return () => {
+        clearTimeout(timeout);
+      };
     }
 
-    // Cleanup
     return () => {
       if (chartInstanceRef.current) {
         chartInstanceRef.current.destroy();
+        chartInstanceRef.current = null;
       }
     };
-  }, []);
+  }, [vitalSigns, loading]);
 
-  const handleAddSymptom = (e: React.FormEvent) => {
+  // Handle adding symptom
+  const handleAddSymptom = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert('Symptom logged successfully! In production, this would save to the database.');
-    setSymptomModalOpen(false);
+    try {
+      await dashboardService.createSymptom({
+        symptom_type: symptomType,
+        severity: severityValue,
+        notes: symptomNotes || undefined,
+      });
+      setSymptomModalOpen(false);
+      setSymptomType('');
+      setSeverityValue(5);
+      setSymptomNotes('');
+      await fetchDashboardData();
+    } catch (error) {
+      console.error('Error adding symptom:', error);
+      alert('Failed to add symptom');
+    }
   };
 
-  const handleAddMedication = (e: React.FormEvent) => {
+  // Handle adding medication
+  const handleAddMedication = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert('Medication added successfully! In production, this would save to the database.');
-    setMedicationModalOpen(false);
+    try {
+      await dashboardService.createMedication({
+        name: medicationName,
+        frequency: medicationFrequency,
+        time: medicationTime || undefined,
+        notes: medicationNotes || undefined,
+      });
+      setMedicationModalOpen(false);
+      setMedicationName('');
+      setMedicationFrequency('');
+      setMedicationTime('');
+      setMedicationNotes('');
+      await fetchDashboardData();
+    } catch (error) {
+      console.error('Error adding medication:', error);
+      alert('Failed to add medication');
+    }
   };
 
-  const toggleMedicationCheck = (index: number) => {
-    const newChecks = [...medicationChecks];
-    newChecks[index] = !newChecks[index];
-    setMedicationChecks(newChecks);
+  // Handle logging medication as taken
+  const handleMedicationCheck = async (medicationId: number) => {
+    // Don't allow if already taken today
+    if (medicationsTakenToday.has(medicationId)) {
+      return;
+    }
+
+    try {
+      await dashboardService.logMedicationTaken(medicationId);
+      // Optimistically update UI
+      setMedicationsTakenToday(prev => new Set(prev).add(medicationId));
+      await fetchDashboardData();
+    } catch (error: any) {
+      console.error('Error logging medication:', error);
+      if (error.response?.status === 400) {
+        // Already logged today
+        alert('This medication has already been logged for today');
+      } else {
+        alert('Failed to log medication');
+      }
+      await fetchDashboardData(); // Refresh to ensure correct state
+    }
+  };
+
+  // Handle adding vital sign
+  const handleAddVitalSign = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await dashboardService.createVitalSign({
+        systolic_bp: systolicBP ? parseInt(systolicBP) : undefined,
+        diastolic_bp: diastolicBP ? parseInt(diastolicBP) : undefined,
+        heart_rate: heartRate ? parseInt(heartRate) : undefined,
+        weight: weight ? parseInt(weight) : undefined,
+      });
+      setVitalSignModalOpen(false);
+      setSystolicBP('');
+      setDiastolicBP('');
+      setHeartRate('');
+      setWeight('');
+      await fetchDashboardData();
+    } catch (error) {
+      console.error('Error adding vital sign:', error);
+      alert('Failed to add vital sign');
+    }
+  };
+
+  // Handle health profile update
+  const handleUpdateHealthProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const profileData = {
+        current_weight: profileWeight ? parseInt(profileWeight) : undefined,
+        height: profileHeight ? parseInt(profileHeight) : undefined,
+        current_conditions: profileConditions ? profileConditions.split(',').map((s) => s.trim()) : [],
+        allergies: profileAllergies ? profileAllergies.split(',').map((s) => s.trim()) : [],
+        family_history: profileFamilyHistory ? profileFamilyHistory.split(',').map((s) => s.trim()) : [],
+      };
+
+      if (healthProfile) {
+        await dashboardService.updateHealthProfile(profileData);
+      } else {
+        await dashboardService.createHealthProfile(profileData);
+      }
+
+      setHealthProfileModalOpen(false);
+      await fetchDashboardData();
+    } catch (error) {
+      console.error('Error updating health profile:', error);
+      alert('Failed to update health profile');
+    }
+  };
+
+  // Open health profile modal with existing data
+  const openHealthProfileModal = () => {
+    if (healthProfile) {
+      setProfileWeight(healthProfile.current_weight?.toString() || '');
+      setProfileHeight(healthProfile.height?.toString() || '');
+      setProfileConditions(healthProfile.current_conditions.join(', '));
+      setProfileAllergies(healthProfile.allergies.join(', '));
+      setProfileFamilyHistory(healthProfile.family_history.join(', '));
+    }
+    setHealthProfileModalOpen(true);
   };
 
   const openCalculator = (type: string) => {
     alert(`${type.toUpperCase()} Calculator would open here. This would be a separate modal with calculator inputs.`);
   };
 
-  const getUserInitials = () => {
-    if (user?.name) {
-      return user.name.split(' ').map(n => n[0]).join('').toUpperCase();
-    }
-    return user?.email?.[0].toUpperCase() || 'U';
+  const getSeverityLabel = (severity: number): string => {
+    if (severity <= 3) return 'low';
+    if (severity <= 6) return 'medium';
+    return 'high';
   };
+
+  const getSymptomIcon = (type: string): string => {
+    const icons: { [key: string]: string } = {
+      headache: '🤕',
+      fatigue: '😴',
+      fever: '🤒',
+      cough: '😷',
+      nausea: '🤢',
+      pain: '😣',
+    };
+    return icons[type] || '🩹';
+  };
+
+  if (loading) {
+    return <div className="dashboard-page">Loading...</div>;
+  }
 
   return (
     <div className="dashboard-page">
-      {/* Dashboard Container */}
       <div className="dashboard-container">
         {/* Header */}
         <div className="dashboard-header">
@@ -124,34 +336,38 @@ const Dashboard: React.FC = () => {
             <div className="stat-header">
               <div className="stat-icon blue">💊</div>
             </div>
-            <div className="stat-value">4/5</div>
+            <div className="stat-value">
+              {summary?.medications_today || 0}/{summary?.total_medications || 0}
+            </div>
             <div className="stat-label">Medications Today</div>
-            <div className="stat-change positive">↑ On track</div>
+            <div className="stat-change positive">
+              {summary && summary.medications_today >= summary.total_medications ? '✓ Complete' : '↑ On track'}
+            </div>
           </div>
 
           <div className="stat-card">
             <div className="stat-header">
               <div className="stat-icon green">❤️</div>
             </div>
-            <div className="stat-value">118/78</div>
+            <div className="stat-value">{summary?.latest_bp || '--/--'}</div>
             <div className="stat-label">Blood Pressure (mmHg)</div>
-            <div className="stat-change positive">↓ 2% from last week</div>
+            <div className="stat-change positive">Latest reading</div>
           </div>
 
           <div className="stat-card">
             <div className="stat-header">
               <div className="stat-icon orange">⚖️</div>
             </div>
-            <div className="stat-value">165 lbs</div>
+            <div className="stat-value">{summary?.latest_weight ? `${summary.latest_weight} lbs` : '--'}</div>
             <div className="stat-label">Current Weight</div>
-            <div className="stat-change positive">↓ 3 lbs this month</div>
+            <div className="stat-change positive">Latest reading</div>
           </div>
 
           <div className="stat-card">
             <div className="stat-header">
               <div className="stat-icon cyan">🔥</div>
             </div>
-            <div className="stat-value">7</div>
+            <div className="stat-value">{summary?.active_streak_days || 0}</div>
             <div className="stat-label">Day Streak</div>
             <div className="stat-change positive">↑ Keep it up!</div>
           </div>
@@ -165,10 +381,18 @@ const Dashboard: React.FC = () => {
             <div className="card">
               <div className="card-header">
                 <h3 className="card-title">Vital Signs Trends</h3>
-                <span className="card-action">Last 7 days</span>
+                <span className="card-action" onClick={() => setVitalSignModalOpen(true)}>
+                  + Add Reading
+                </span>
               </div>
               <div className="chart-container">
-                <canvas ref={chartRef}></canvas>
+                {vitalSigns.length > 0 ? (
+                  <canvas ref={chartRef}></canvas>
+                ) : (
+                  <p style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                    No vital signs recorded yet. Click "+ Add Reading" to start tracking!
+                  </p>
+                )}
               </div>
             </div>
 
@@ -181,36 +405,28 @@ const Dashboard: React.FC = () => {
                 </span>
               </div>
               <div className="symptom-list">
-                <div className="symptom-item">
-                  <div className="symptom-info">
-                    <div className="symptom-icon">🤕</div>
-                    <div className="symptom-details">
-                      <h4>Headache</h4>
-                      <span className="symptom-time">Today, 2:30 PM</span>
+                {symptoms.length > 0 ? (
+                  symptoms.slice(0, 5).map((symptom) => (
+                    <div key={symptom.id} className="symptom-item">
+                      <div className="symptom-info">
+                        <div className="symptom-icon">{getSymptomIcon(symptom.symptom_type)}</div>
+                        <div className="symptom-details">
+                          <h4>{symptom.symptom_type.charAt(0).toUpperCase() + symptom.symptom_type.slice(1)}</h4>
+                          <span className="symptom-time">
+                            {new Date(symptom.created_at).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                      <span className={`severity-badge ${getSeverityLabel(symptom.severity)}`}>
+                        {getSeverityLabel(symptom.severity)}
+                      </span>
                     </div>
-                  </div>
-                  <span className="severity-badge medium">Medium</span>
-                </div>
-                <div className="symptom-item">
-                  <div className="symptom-info">
-                    <div className="symptom-icon">😴</div>
-                    <div className="symptom-details">
-                      <h4>Fatigue</h4>
-                      <span className="symptom-time">Today, 10:00 AM</span>
-                    </div>
-                  </div>
-                  <span className="severity-badge low">Low</span>
-                </div>
-                <div className="symptom-item">
-                  <div className="symptom-info">
-                    <div className="symptom-icon">🤒</div>
-                    <div className="symptom-details">
-                      <h4>Mild Fever</h4>
-                      <span className="symptom-time">Yesterday, 8:00 PM</span>
-                    </div>
-                  </div>
-                  <span className="severity-badge low">Low</span>
-                </div>
+                  ))
+                ) : (
+                  <p style={{ textAlign: 'center', padding: '1rem', color: '#666' }}>
+                    No symptoms logged yet
+                  </p>
+                )}
               </div>
             </div>
 
@@ -251,51 +467,32 @@ const Dashboard: React.FC = () => {
                 </span>
               </div>
               <div className="medication-list">
-                <div className="medication-item">
-                  <div className="medication-info">
-                    <div className="medication-icon">💊</div>
-                    <div className="medication-details">
-                      <h4>Aspirin 81mg</h4>
-                      <span className="medication-time">8:00 AM daily</span>
+                {medications.length > 0 ? (
+                  medications.map((medication) => (
+                    <div key={medication.id} className="medication-item">
+                      <div className="medication-info">
+                        <div className="medication-icon">💊</div>
+                        <div className="medication-details">
+                          <h4>{medication.name}</h4>
+                          <span className="medication-time">
+                            {medication.time || ''} {medication.frequency}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        className={`check-btn ${medicationsTakenToday.has(medication.id) ? 'checked' : ''}`}
+                        onClick={() => handleMedicationCheck(medication.id)}
+                        disabled={medicationsTakenToday.has(medication.id)}
+                      >
+                        {medicationsTakenToday.has(medication.id) ? '✓' : '○'}
+                      </button>
                     </div>
-                  </div>
-                  <button
-                    className={`check-btn ${medicationChecks[0] ? 'checked' : ''}`}
-                    onClick={() => toggleMedicationCheck(0)}
-                  >
-                    {medicationChecks[0] ? '✓' : '○'}
-                  </button>
-                </div>
-                <div className="medication-item">
-                  <div className="medication-info">
-                    <div className="medication-icon">💊</div>
-                    <div className="medication-details">
-                      <h4>Vitamin D</h4>
-                      <span className="medication-time">12:00 PM daily</span>
-                    </div>
-                  </div>
-                  <button
-                    className={`check-btn ${medicationChecks[1] ? 'checked' : ''}`}
-                    onClick={() => toggleMedicationCheck(1)}
-                  >
-                    {medicationChecks[1] ? '✓' : '○'}
-                  </button>
-                </div>
-                <div className="medication-item">
-                  <div className="medication-info">
-                    <div className="medication-icon">💊</div>
-                    <div className="medication-details">
-                      <h4>Omega-3</h4>
-                      <span className="medication-time">8:00 PM daily</span>
-                    </div>
-                  </div>
-                  <button
-                    className={`check-btn ${medicationChecks[2] ? 'checked' : ''}`}
-                    onClick={() => toggleMedicationCheck(2)}
-                  >
-                    {medicationChecks[2] ? '✓' : '○'}
-                  </button>
-                </div>
+                  ))
+                ) : (
+                  <p style={{ textAlign: 'center', padding: '1rem', color: '#666' }}>
+                    No medications added yet
+                  </p>
+                )}
               </div>
             </div>
 
@@ -303,34 +500,60 @@ const Dashboard: React.FC = () => {
             <div className="card">
               <div className="card-header">
                 <h3 className="card-title">Health Profile</h3>
-                <span
-                  className="card-action"
-                  onClick={() => alert('Edit Profile feature coming soon!')}
-                >
-                  Edit
+                <span className="card-action" onClick={openHealthProfileModal}>
+                  {healthProfile ? 'Edit' : 'Create'}
                 </span>
               </div>
-              <div className="profile-section">
-                <h4>Current Conditions</h4>
-                <div className="profile-tags">
-                  <span className="profile-tag">Hypertension</span>
-                  <span className="profile-tag">Type 2 Diabetes</span>
-                </div>
-              </div>
-              <div className="profile-section">
-                <h4>Allergies</h4>
-                <div className="profile-tags">
-                  <span className="profile-tag">Penicillin</span>
-                  <span className="profile-tag">Peanuts</span>
-                </div>
-              </div>
-              <div className="profile-section">
-                <h4>Family History</h4>
-                <div className="profile-tags">
-                  <span className="profile-tag">Heart Disease</span>
-                  <span className="profile-tag">Diabetes</span>
-                </div>
-              </div>
+              {healthProfile ? (
+                <>
+                  <div className="profile-section">
+                    <h4>Current Conditions</h4>
+                    <div className="profile-tags">
+                      {healthProfile.current_conditions.length > 0 ? (
+                        healthProfile.current_conditions.map((condition, idx) => (
+                          <span key={idx} className="profile-tag">
+                            {condition}
+                          </span>
+                        ))
+                      ) : (
+                        <span style={{ color: '#666' }}>None listed</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="profile-section">
+                    <h4>Allergies</h4>
+                    <div className="profile-tags">
+                      {healthProfile.allergies.length > 0 ? (
+                        healthProfile.allergies.map((allergy, idx) => (
+                          <span key={idx} className="profile-tag">
+                            {allergy}
+                          </span>
+                        ))
+                      ) : (
+                        <span style={{ color: '#666' }}>None listed</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="profile-section">
+                    <h4>Family History</h4>
+                    <div className="profile-tags">
+                      {healthProfile.family_history.length > 0 ? (
+                        healthProfile.family_history.map((history, idx) => (
+                          <span key={idx} className="profile-tag">
+                            {history}
+                          </span>
+                        ))
+                      ) : (
+                        <span style={{ color: '#666' }}>None listed</span>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p style={{ textAlign: 'center', padding: '1rem', color: '#666' }}>
+                  Create your health profile to get started
+                </p>
+              )}
             </div>
 
             {/* AI Recommendations */}
@@ -341,21 +564,15 @@ const Dashboard: React.FC = () => {
               <div className="recommendations-list">
                 <div className="recommendation-item">
                   <h5>💪 Increase Physical Activity</h5>
-                  <p>
-                    Based on your weight goals, try adding 15 minutes of walking daily.
-                  </p>
+                  <p>Based on your weight goals, try adding 15 minutes of walking daily.</p>
                 </div>
                 <div className="recommendation-item">
                   <h5>😴 Improve Sleep Schedule</h5>
-                  <p>
-                    Your symptom patterns suggest inconsistent sleep. Aim for 7-8 hours nightly.
-                  </p>
+                  <p>Your symptom patterns suggest inconsistent sleep. Aim for 7-8 hours nightly.</p>
                 </div>
                 <div className="recommendation-item">
                   <h5>💧 Hydration Reminder</h5>
-                  <p>
-                    Drink at least 8 glasses of water daily to help with headaches.
-                  </p>
+                  <p>Drink at least 8 glasses of water daily to help with headaches.</p>
                 </div>
               </div>
             </div>
@@ -365,18 +582,23 @@ const Dashboard: React.FC = () => {
 
       {/* Add Symptom Modal */}
       {symptomModalOpen && (
-        <div className="modal active" onClick={(e) => {
-          if (e.target === e.currentTarget) setSymptomModalOpen(false);
-        }}>
+        <div
+          className="modal active"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSymptomModalOpen(false);
+          }}
+        >
           <div className="modal-content">
             <div className="modal-header">
               <h3 className="modal-title">Log Symptom</h3>
-              <button className="close-btn" onClick={() => setSymptomModalOpen(false)}>×</button>
+              <button className="close-btn" onClick={() => setSymptomModalOpen(false)}>
+                ×
+              </button>
             </div>
             <form onSubmit={handleAddSymptom}>
               <div className="form-group">
                 <label>Symptom Type</label>
-                <select required>
+                <select required value={symptomType} onChange={(e) => setSymptomType(e.target.value)}>
                   <option value="">Select symptom</option>
                   <option value="headache">Headache</option>
                   <option value="fatigue">Fatigue</option>
@@ -403,9 +625,16 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="form-group">
                 <label>Notes (Optional)</label>
-                <textarea rows={3} placeholder="Any additional details..."></textarea>
+                <textarea
+                  rows={3}
+                  placeholder="Any additional details..."
+                  value={symptomNotes}
+                  onChange={(e) => setSymptomNotes(e.target.value)}
+                ></textarea>
               </div>
-              <button type="submit" className="submit-btn">Log Symptom</button>
+              <button type="submit" className="submit-btn">
+                Log Symptom
+              </button>
             </form>
           </div>
         </div>
@@ -413,22 +642,37 @@ const Dashboard: React.FC = () => {
 
       {/* Add Medication Modal */}
       {medicationModalOpen && (
-        <div className="modal active" onClick={(e) => {
-          if (e.target === e.currentTarget) setMedicationModalOpen(false);
-        }}>
+        <div
+          className="modal active"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setMedicationModalOpen(false);
+          }}
+        >
           <div className="modal-content">
             <div className="modal-header">
               <h3 className="modal-title">Add Medication</h3>
-              <button className="close-btn" onClick={() => setMedicationModalOpen(false)}>×</button>
+              <button className="close-btn" onClick={() => setMedicationModalOpen(false)}>
+                ×
+              </button>
             </div>
             <form onSubmit={handleAddMedication}>
               <div className="form-group">
                 <label>Medication Name</label>
-                <input type="text" placeholder="e.g., Aspirin 81mg" required />
+                <input
+                  type="text"
+                  placeholder="e.g., Aspirin 81mg"
+                  required
+                  value={medicationName}
+                  onChange={(e) => setMedicationName(e.target.value)}
+                />
               </div>
               <div className="form-group">
                 <label>Frequency</label>
-                <select required>
+                <select
+                  required
+                  value={medicationFrequency}
+                  onChange={(e) => setMedicationFrequency(e.target.value)}
+                >
                   <option value="">Select frequency</option>
                   <option value="daily">Daily</option>
                   <option value="twice">Twice daily</option>
@@ -438,13 +682,156 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="form-group">
                 <label>Time</label>
-                <input type="time" required />
+                <input
+                  type="time"
+                  value={medicationTime}
+                  onChange={(e) => setMedicationTime(e.target.value)}
+                />
               </div>
               <div className="form-group">
                 <label>Notes (Optional)</label>
-                <textarea rows={2} placeholder="Instructions, reminders..."></textarea>
+                <textarea
+                  rows={2}
+                  placeholder="Instructions, reminders..."
+                  value={medicationNotes}
+                  onChange={(e) => setMedicationNotes(e.target.value)}
+                ></textarea>
               </div>
-              <button type="submit" className="submit-btn">Add Medication</button>
+              <button type="submit" className="submit-btn">
+                Add Medication
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Vital Sign Modal */}
+      {vitalSignModalOpen && (
+        <div
+          className="modal active"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setVitalSignModalOpen(false);
+          }}
+        >
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3 className="modal-title">Log Vital Signs</h3>
+              <button className="close-btn" onClick={() => setVitalSignModalOpen(false)}>
+                ×
+              </button>
+            </div>
+            <form onSubmit={handleAddVitalSign}>
+              <div className="form-group">
+                <label>Blood Pressure (Systolic)</label>
+                <input
+                  type="number"
+                  placeholder="e.g., 120"
+                  value={systolicBP}
+                  onChange={(e) => setSystolicBP(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label>Blood Pressure (Diastolic)</label>
+                <input
+                  type="number"
+                  placeholder="e.g., 80"
+                  value={diastolicBP}
+                  onChange={(e) => setDiastolicBP(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label>Heart Rate (bpm)</label>
+                <input
+                  type="number"
+                  placeholder="e.g., 72"
+                  value={heartRate}
+                  onChange={(e) => setHeartRate(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label>Weight (lbs)</label>
+                <input
+                  type="number"
+                  step="1"
+                  placeholder="e.g., 165"
+                  value={weight}
+                  onChange={(e) => setWeight(e.target.value)}
+                />
+              </div>
+              <button type="submit" className="submit-btn">
+                Log Vital Signs
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Health Profile Modal */}
+      {healthProfileModalOpen && (
+        <div
+          className="modal active"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setHealthProfileModalOpen(false);
+          }}
+        >
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3 className="modal-title">{healthProfile ? 'Edit' : 'Create'} Health Profile</h3>
+              <button className="close-btn" onClick={() => setHealthProfileModalOpen(false)}>
+                ×
+              </button>
+            </div>
+            <form onSubmit={handleUpdateHealthProfile}>
+              <div className="form-group">
+                <label>Current Weight (lbs)</label>
+                <input
+                  type="number"
+                  step="1"
+                  placeholder="e.g., 165"
+                  value={profileWeight}
+                  onChange={(e) => setProfileWeight(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label>Height (inches)</label>
+                <input
+                  type="number"
+                  step="1"
+                  placeholder="e.g., 68"
+                  value={profileHeight}
+                  onChange={(e) => setProfileHeight(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label>Current Conditions (comma-separated)</label>
+                <input
+                  type="text"
+                  placeholder="e.g., Hypertension, Type 2 Diabetes"
+                  value={profileConditions}
+                  onChange={(e) => setProfileConditions(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label>Allergies (comma-separated)</label>
+                <input
+                  type="text"
+                  placeholder="e.g., Penicillin, Peanuts"
+                  value={profileAllergies}
+                  onChange={(e) => setProfileAllergies(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label>Family History (comma-separated)</label>
+                <input
+                  type="text"
+                  placeholder="e.g., Heart Disease, Diabetes"
+                  value={profileFamilyHistory}
+                  onChange={(e) => setProfileFamilyHistory(e.target.value)}
+                />
+              </div>
+              <button type="submit" className="submit-btn">
+                {healthProfile ? 'Update' : 'Create'} Profile
+              </button>
             </form>
           </div>
         </div>
@@ -454,4 +841,3 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
-
