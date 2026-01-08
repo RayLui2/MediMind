@@ -14,5 +14,10 @@ class User(Base):
     age = Column(Integer)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    # Relationship to conversations
+    # Relationships
     conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
+    health_profile = relationship("HealthProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    medications = relationship("Medication", back_populates="user", cascade="all, delete-orphan")
+    medication_logs = relationship("MedicationLog", back_populates="user", cascade="all, delete-orphan")
+    symptoms = relationship("Symptom", back_populates="user", cascade="all, delete-orphan")
+    vital_signs = relationship("VitalSign", back_populates="user", cascade="all, delete-orphan")
