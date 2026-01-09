@@ -22,4 +22,4 @@ class State(BaseModel):
     chat_history: Annotated[List[ChatMessage], lambda curr_history, new_chats: curr_history + new_chats] = []
 
     # Summary of the first message in the conversation
-    conversation_title: Optional[str] = "New Conversation"
+    conversation_title: Optional[str] = "New Chat"

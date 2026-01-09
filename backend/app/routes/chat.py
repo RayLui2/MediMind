@@ -93,7 +93,7 @@ async def stream_chat_message(
     db.refresh(user_message)
 
     # Generate title using LangGraph summarizer for new conversations
-    if not conversation_id and conversation.title != "New Conversation":  # Only for new conversations
+    if not conversation_id and conversation.title == "New Chat":  # Only for new conversations
         try:
             from assistant.chat import assistant_graph
 
@@ -104,9 +104,9 @@ async def stream_chat_message(
                 "messages": [SystemMessage(content=system_prompt), HumanMessage(content=message.content)],
             }, config=config)
 
-            # Extract summary from result
-            if result.get("summary"):
-                conversation.title = result["summary"]
+            # Extract conversation_title from result
+            if result.get("conversation_title") and result["conversation_title"] != "New Chat":
+                conversation.title = result["conversation_title"]
             db.commit()
             db.refresh(conversation)
             print(f"Updated title from message: {conversation.title}", flush=True)

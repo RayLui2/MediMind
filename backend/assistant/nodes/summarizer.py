@@ -15,9 +15,9 @@ def create_summarizer_node():
     
     def summarizer_node(state: State):
         # Only summarize if there's no summary yet
-        if state.conversation_title != "New Conversation":
+        if state.conversation_title != "New Chat":
             return {"conversation_title": state.conversation_title}
-        
+
         # Get the first user message
         messages = state.messages
         first_user_msg = None
@@ -25,9 +25,9 @@ def create_summarizer_node():
             if isinstance(msg, HumanMessage):
                 first_user_msg = msg.content
                 break
-        
+
         if not first_user_msg:
-            return {"conversation_title": "New Conversation"}
+            return {"conversation_title": "New Chat"}
         
         # Create summarization prompt
         prompt = f"""Generate a concise, descriptive title (max 6 words) with an emoji at the end of the title. The title should be a single sentence and should be descriptive of the conversation:
