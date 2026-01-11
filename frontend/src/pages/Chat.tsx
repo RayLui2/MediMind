@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { useNavigate } from 'react-router-dom'
 import chatService from '../services/chatService'
 import ReactMarkdown from 'react-markdown'
 import './Chat.css'
+import authService from '../services/authService'
 
 interface Message {
   id: number | string
@@ -22,9 +22,10 @@ interface Conversation {
   messages?: Message[]
 }
 
+const API_URL = 'http://localhost:8000';
+
 const Chat: React.FC = () => {
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
+  const { user } = useAuth()
 
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [currentConversation, setCurrentConversation] =
@@ -95,77 +96,129 @@ const Chat: React.FC = () => {
     const tempAssistantId = `temp-${Date.now()}`
 
     try {
-      const response = await chatService.sendMessage(
-        messageContent,
-        currentConversation?.id,
-        {
-          // When metadata arrives, create placeholder assistant message
-          onMetadata: (metadata) => {
-            setMessages((prev) => {
-              // Replace temp user message with real one
-              const withoutTempUser = prev.filter(
-                (msg) => msg.id !== tempUserMessage.id
-              )
-
-              // Add real user message and empty assistant message
-              return [
-                ...withoutTempUser,
-                {
-                  id: metadata.user_message_id,
-                  conversation_id: metadata.conversation_id,
-                  role: 'user',
-                  content: messageContent,
-                  created_at: new Date().toISOString(),
-                },
-                {
-                  id: tempAssistantId,
-                  conversation_id: metadata.conversation_id,
-                  role: 'assistant',
-                  content: '',
-                  created_at: new Date().toISOString(),
-                },
-              ]
-            })
-            // Hide typing indicator when streaming starts
-            setLoading(false)
-          },
-
-          // Update assistant message as chunks arrive
-          onChunk: (chunk) => {
-            setMessages((prev) => {
-              const updated = [...prev]
-              const assistantMsgIndex = updated.findIndex(
-                (msg) => msg.id === tempAssistantId
-              )
-              if (assistantMsgIndex !== -1) {
-                updated[assistantMsgIndex] = {
-                  ...updated[assistantMsgIndex],
-                  content: updated[assistantMsgIndex].content + chunk,
-                }
-              }
-              return updated
-            })
-          },
-        }
-      )
-
-      // Replace temp assistant message with final one
-      setMessages((prev) => {
-        const updated = [...prev]
-        const assistantMsgIndex = updated.findIndex(
-          (msg) => msg.id === tempAssistantId
-        )
-        if (assistantMsgIndex !== -1) {
-          updated[assistantMsgIndex] = response.assistant_message
-        }
-        return updated
+      // Make fetch request
+      const response = await fetch(`${API_URL}/chat/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authService.getToken() || ''}`,
+        },
+        body: JSON.stringify({ content: messageContent }),
       })
 
-      // Update current conversation
-      setCurrentConversation(response.conversation)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
 
-      // Reload conversations list
-      loadConversations()
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error('No response body')
+      }
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let accumulatedText = ''
+      let conversationId = currentConversation?.id || null
+      let assistantMessageId: number | null = null
+
+      // Read stream
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || '' // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+
+              if (data.type === 'metadata') {
+                console.log('📦 Metadata received:', data)
+                conversationId = data.conversation_id
+
+                setMessages((prev) => {
+                  // Remove temp user message and replace with real one
+                  const withoutTempUser = prev.filter(
+                    (msg) => msg.id !== tempUserMessage.id
+                  )
+
+                  return [
+                    ...withoutTempUser,
+                    {
+                      id: data.user_message_id,
+                      conversation_id: data.conversation_id,
+                      role: 'user',
+                      content: messageContent,
+                      created_at: new Date().toISOString(),
+                    },
+                    {
+                      id: tempAssistantId,
+                      conversation_id: data.conversation_id,
+                      role: 'assistant',
+                      content: '',
+                      created_at: new Date().toISOString(),
+                    },
+                  ]
+                })
+                setLoading(false)
+              } else if (data.type === 'chunk') {
+                console.log('📨 Chunk received:', data.text)
+                accumulatedText += data.text
+                setMessages((prev) => {
+                  const updated = [...prev]
+                  const assistantMsgIndex = updated.findIndex(
+                    (msg) => msg.id === tempAssistantId
+                  )
+                  if (assistantMsgIndex !== -1) {
+                    updated[assistantMsgIndex] = {
+                      ...updated[assistantMsgIndex],
+                      content: accumulatedText,
+                    }
+                  }
+                  return updated
+                })
+              } else if (data.type === 'complete') {
+                console.log('✅ Stream complete, message ID:', data.assistant_message_id)
+                assistantMessageId = data.assistant_message_id
+
+                // Update assistant message with real ID
+                setMessages((prev) => {
+                  const updated = [...prev]
+                  const assistantMsgIndex = updated.findIndex(
+                    (msg) => msg.id === tempAssistantId
+                  )
+                  if (assistantMsgIndex !== -1) {
+                    updated[assistantMsgIndex] = {
+                      ...updated[assistantMsgIndex],
+                      id: data.assistant_message_id,
+                    }
+                  }
+                  return updated
+                })
+
+                // Update current conversation
+                setCurrentConversation({
+                  id: data.conversation_id,
+                  user_id: user?.id || 0,
+                  title: data.conversation_title || 'New Conversation',
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                })
+
+                // Reload conversations list
+                loadConversations()
+              } else if (data.type === 'error') {
+                throw new Error(data.message)
+              }
+            } catch (e) {
+              console.error('Error parsing SSE data:', e)
+            }
+          }
+        }
+      }
     } catch (error) {
       console.error('Failed to send message:', error)
 
@@ -239,11 +292,6 @@ const Chat: React.FC = () => {
     })
 
     return groups
-  }
-
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
   }
 
   const conversationGroups = groupConversationsByDate()
@@ -372,7 +420,7 @@ const Chat: React.FC = () => {
                   placeholder="Ask me anything about your health..."
                   value={inputValue}
                   onChange={handleTextareaChange}
-                  onKeyPress={handleKeyPress}
+                  onKeyDown={handleKeyPress}
                   rows={1}
                   disabled={loading}
                 />
