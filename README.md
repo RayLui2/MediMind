@@ -14,6 +14,8 @@ AI-powered healthcare assistant for personal health tracking and medical guidanc
   - [Environment Variables](#environment-variables)
   - [Running the Application](#running-the-application)
 - [API Documentation](#api-documentation)
+- [Architecture](#architecture)
+  - [LangGraph AI Assistant](#langgraph-ai-assistant)
 - [Development](#development)
 - [Testing](#testing)
 - [Contributing](#contributing)
@@ -22,19 +24,22 @@ AI-powered healthcare assistant for personal health tracking and medical guidanc
 ## Overview
 
 MediMind is a comprehensive full-stack healthcare application that empowers users to take control of their health through:
-- **AI-Powered Medical Assistant**: Conversational medical guidance using Google's Gemini AI
+- **AI-Powered Medical Assistant**: Conversational medical guidance using LangGraph and Google's Gemini AI with real-time streaming responses
 - **Health Monitoring Dashboard**: Track vital signs, symptoms, and health metrics with interactive visualizations
 - **Medication Management**: Never miss a dose with smart medication tracking and reminders
 - **Symptom Logging**: Monitor and track symptoms over time to identify patterns
 - **Personalized Insights**: Receive AI-driven health recommendations based on your data
 - **Secure Health Records**: User authentication and encrypted health data management
+- **Stateful Conversations**: Persistent conversation history with PostgreSQL-backed checkpointing
 
 ## Features
 
 ### Current Features
 - **User Authentication**: Secure signup and login with JWT-based authentication
-- **AI Chat Interface**: Interactive chat with AI medical assistant powered by Gemini
-- **Conversation History**: Save and retrieve past medical conversations
+- **AI Chat Interface**: Interactive chat with AI medical assistant powered by LangGraph and Gemini
+- **Streaming Responses**: Real-time AI message streaming using fetch API for instant feedback
+- **Conversation History**: Save and retrieve past medical conversations with auto-updating titles
+- **LangGraph Architecture**: Modular AI assistant with summarization nodes and checkpointing
 - **Health Dashboard**: Personal health data visualization and tracking with interactive charts
 - **Health Metrics Tracking**: Monitor vital signs including blood pressure, heart rate, and weight
 - **Symptom Tracker**: Log and track symptoms with severity levels and timestamps
@@ -42,6 +47,7 @@ MediMind is a comprehensive full-stack healthcare application that empowers user
 - **Health Profile**: Manage current conditions, allergies, and family history
 - **Health Calculators**: Built-in BMI, BMR, water intake, and health risk calculators
 - **AI Recommendations**: Personalized health insights and recommendations
+- **User Profile Management**: User icon and dropdown menu for account management
 - **Responsive Design**: Modern, mobile-friendly UI built with React
 
 ### Planned Features
@@ -63,12 +69,15 @@ MediMind is a comprehensive full-stack healthcare application that empowers user
 - **React Testing Library** - Component testing
 
 ### Backend
-- **FastAPI** 0.104.1 - Modern Python web framework
+- **FastAPI** 0.115+ - Modern Python web framework
+- **LangGraph** 0.2.51 - AI agent orchestration and workflow management
+- **LangChain** 0.3.21 - LLM application framework
+- **LangChain Google GenAI** 2.0.11 - Google Gemini integration
+- **LangGraph Checkpoint PostgreSQL** 2.0.10 - Conversation state persistence
 - **SQLAlchemy** 2.0.23 - SQL toolkit and ORM
 - **PostgreSQL** (via psycopg2-binary) - Database
-- **Google Gemini AI** - AI chat capabilities
 - **JWT Authentication** - Secure token-based auth
-- **Uvicorn** - ASGI server
+- **Uvicorn** 0.30+ - ASGI server
 
 ## Project Structure
 
@@ -95,13 +104,33 @@ MediMind/
 │   │   ├── models/          # SQLAlchemy models
 │   │   │   ├── user.py      # User model
 │   │   │   ├── conversations.py
-│   │   │   └── message.py
+│   │   │   ├── message.py
+│   │   │   ├── health_profile.py
+│   │   │   ├── medication.py
+│   │   │   ├── symptom.py
+│   │   │   └── vital_sign.py
 │   │   ├── routes/          # API endpoints
 │   │   │   ├── auth.py      # Authentication routes
-│   │   │   └── chat.py      # Chat routes
+│   │   │   ├── chat.py      # Chat routes (streaming support)
+│   │   │   └── dashboard.py # Health dashboard routes
 │   │   ├── schemas/         # Pydantic schemas
-│   │   ├── services/        # Business logic
+│   │   │   ├── auth.py
+│   │   │   ├── user.py
+│   │   │   ├── chat.py
+│   │   │   └── dashboard.py
 │   │   └── utils/           # Utility functions
+│   │       └── security.py  # Security and auth utilities
+│   ├── assistant/           # LangGraph AI assistant
+│   │   ├── chat.py          # Main assistant graph
+│   │   ├── state.py         # Assistant state management
+│   │   ├── system_prompt.py # System instructions
+│   │   ├── nodes/           # LangGraph nodes
+│   │   └── models/          # Assistant models
+│   ├── tests/               # Test suite
+│   │   ├── test_assistant.py
+│   │   ├── test_gemini.py
+│   │   ├── test_schemas.py
+│   │   └── test_security.py
 │   ├── requirements.txt     # Python dependencies
 │   └── .env                 # Environment variables (not in git)
 │
@@ -194,12 +223,44 @@ Once the backend is running, visit:
 #### Chat
 - `POST /chat/conversations` - Create new conversation
 - `GET /chat/conversations` - Get user's conversations
-- `POST /chat/messages` - Send message and get AI response
+- `POST /chat/messages` - Send message and get AI response (supports streaming)
 - `GET /chat/conversations/{id}/messages` - Get conversation messages
+- `PUT /chat/conversations/{id}/title` - Update conversation title
+
+#### Dashboard
+- `GET /dashboard/health-profile` - Get user's health profile
+- `POST /dashboard/health-profile` - Create/update health profile
+- `GET /dashboard/vital-signs` - Get vital signs history
+- `POST /dashboard/vital-signs` - Log new vital sign measurement
+- `GET /dashboard/symptoms` - Get symptom history
+- `POST /dashboard/symptoms` - Log new symptom
+- `GET /dashboard/medications` - Get medication list
+- `POST /dashboard/medications` - Add new medication
+- `PUT /dashboard/medications/{id}/check-off` - Mark medication as taken
 
 #### Health
 - `GET /health` - Health check endpoint
 - `GET /test-db` - Database connection test
+
+## Architecture
+
+### LangGraph AI Assistant
+
+MediMind uses LangGraph to orchestrate AI conversations with advanced features:
+
+- **Modular Node Architecture**: Separate nodes for chat handling, summarization, and response generation
+- **Stateful Conversations**: PostgreSQL-backed checkpointing ensures conversation context is preserved
+- **Streaming Responses**: Real-time message streaming using Server-Sent Events for responsive UX
+- **Conversation Summarization**: Automatic summarization of chat history to maintain context efficiently
+- **Structured System Prompts**: Medical-focused system instructions optimized for healthcare guidance
+
+The assistant workflow:
+1. User message received via REST API
+2. LangGraph processes message through defined nodes
+3. Context retrieved from PostgreSQL checkpoint
+4. Gemini generates response with medical expertise
+5. Response streamed back to frontend in real-time
+6. Conversation state saved to checkpoint for future reference
 
 ## Development
 
@@ -210,6 +271,7 @@ Once the backend is running, visit:
    cd backend
    python create_tables.py
    python create_chat_tables.py
+   python create_dashboard_tables.py
    ```
 
 ### Running Tests
@@ -219,9 +281,10 @@ Once the backend is running, visit:
 cd backend
 pytest
 # Or run specific test files
-python test_schemas.py
-python test_security.py
-python test_gemini.py
+python tests/test_schemas.py
+python tests/test_security.py
+python tests/test_gemini.py
+python tests/test_assistant.py
 ```
 
 **Frontend tests:**
