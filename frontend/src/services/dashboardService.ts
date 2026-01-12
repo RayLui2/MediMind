@@ -102,8 +102,13 @@ export const createMedication = async (data: {
   frequency: string;
   time?: string;
   notes?: string;
+  is_active?: boolean;
 }): Promise<Medication> => {
-  const response = await axios.post(`${API_URL}/medications`, data, getAuthHeaders());
+  const payload = {
+    ...data,
+    is_active: data.is_active ?? true, // Default to true if not provided
+  };
+  const response = await axios.post(`${API_URL}/medications`, payload, getAuthHeaders());
   return response.data;
 };
 

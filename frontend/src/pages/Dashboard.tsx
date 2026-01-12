@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Chart, registerables } from 'chart.js';
 import '../styles/Dashboard.css';
 import * as dashboardService from '../services/dashboardService';
+import { filterSymptoms } from '../data/symptoms';
 
 Chart.register(...registerables);
 
@@ -29,12 +30,16 @@ const Dashboard: React.FC = () => {
   const [symptomType, setSymptomType] = useState('');
   const [severityValue, setSeverityValue] = useState(5);
   const [symptomNotes, setSymptomNotes] = useState('');
+  const [symptomSuggestions, setSymptomSuggestions] = useState<string[]>([]);
+  const [showSymptomSuggestions, setShowSymptomSuggestions] = useState(false);
 
   // Form states for medication modal
   const [medicationName, setMedicationName] = useState('');
   const [medicationFrequency, setMedicationFrequency] = useState('');
   const [medicationTime, setMedicationTime] = useState('');
   const [medicationNotes, setMedicationNotes] = useState('');
+  const [medicationSuggestions, setMedicationSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Form states for vital sign modal
   const [systolicBP, setSystolicBP] = useState('');
@@ -167,6 +172,49 @@ const Dashboard: React.FC = () => {
     };
   }, [vitalSigns, loading]);
 
+  // Handle symptom type input change with autocomplete
+  const handleSymptomTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSymptomType(value);
+
+    // Filter symptoms based on input
+    const filtered = filterSymptoms(value);
+    setSymptomSuggestions(filtered);
+    setShowSymptomSuggestions(filtered.length > 0);
+  };
+
+  // Handle selecting a symptom from suggestions
+  const handleSelectSymptom = (symptom: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setSymptomType(symptom);
+    setShowSymptomSuggestions(false);
+    setSymptomSuggestions([]);
+  };
+
+  // Close symptom suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.closest('.symptom-suggestions')) {
+        return;
+      }
+      if (showSymptomSuggestions) {
+        setShowSymptomSuggestions(false);
+      }
+    };
+
+    if (showSymptomSuggestions) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSymptomSuggestions]);
+
   // Handle adding symptom
   const handleAddSymptom = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,6 +228,8 @@ const Dashboard: React.FC = () => {
       setSymptomType('');
       setSeverityValue(5);
       setSymptomNotes('');
+      setSymptomSuggestions([]);
+      setShowSymptomSuggestions(false);
       await fetchDashboardData();
     } catch (error) {
       console.error('Error adding symptom:', error);
@@ -187,25 +237,104 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // Search RxNorm for medication suggestions
+  const searchMedications = async (searchTerm: string) => {
+    if (searchTerm.length < 2) {
+      setMedicationSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://clinicaltables.nlm.nih.gov/api/rxterms/v3/search?terms=${encodeURIComponent(searchTerm)}&ef=STRENGTHS_AND_FORMS&maxList=10`
+      );
+      const data = await response.json();
+
+      // Response format: [count, codes, extraData, displayStrings]
+      if (data && data[3]) {
+        setMedicationSuggestions(data[3]);
+        setShowSuggestions(true);
+      }
+    } catch (error) {
+      console.error('Error fetching medication suggestions:', error);
+    }
+  };
+
+  // Debounce medication search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchMedications(medicationName);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [medicationName]);
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      // Don't close if clicking on a suggestion
+      if (target.closest('.medication-suggestions')) {
+        return;
+      }
+      if (showSuggestions) {
+        setShowSuggestions(false);
+      }
+    };
+
+    if (showSuggestions) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSuggestions]);
+
+  // Handle medication name input change
+  const handleMedicationNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setMedicationName(e.target.value);
+  };
+
+  // Handle selecting a medication from suggestions
+  const handleSelectSuggestion = (suggestion: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setMedicationName(suggestion);
+    setShowSuggestions(false);
+    setMedicationSuggestions([]);
+  };
+
   // Handle adding medication
   const handleAddMedication = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await dashboardService.createMedication({
-        name: medicationName,
+      // Ensure name is a string (in case it's somehow an array)
+      const nameString = Array.isArray(medicationName) ? medicationName[0] : medicationName;
+
+      const payload = {
+        name: nameString,
         frequency: medicationFrequency,
         time: medicationTime || undefined,
         notes: medicationNotes || undefined,
-      });
+      };
+      console.log('Sending medication payload:', payload);
+      await dashboardService.createMedication(payload);
       setMedicationModalOpen(false);
       setMedicationName('');
       setMedicationFrequency('');
       setMedicationTime('');
       setMedicationNotes('');
+      setMedicationSuggestions([]);
+      setShowSuggestions(false);
       await fetchDashboardData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding medication:', error);
-      alert('Failed to add medication');
+      console.error('Error response data:', error.response?.data);
+      alert(`Failed to add medication: ${JSON.stringify(error.response?.data?.detail || error.message)}`);
     }
   };
 
@@ -596,18 +725,50 @@ const Dashboard: React.FC = () => {
               </button>
             </div>
             <form onSubmit={handleAddSymptom}>
-              <div className="form-group">
+              <div className="form-group" style={{ position: 'relative' }}>
                 <label>Symptom Type</label>
-                <select required value={symptomType} onChange={(e) => setSymptomType(e.target.value)}>
-                  <option value="">Select symptom</option>
-                  <option value="headache">Headache</option>
-                  <option value="fatigue">Fatigue</option>
-                  <option value="fever">Fever</option>
-                  <option value="cough">Cough</option>
-                  <option value="nausea">Nausea</option>
-                  <option value="pain">Pain</option>
-                  <option value="other">Other</option>
-                </select>
+                <input
+                  type="text"
+                  placeholder="Start typing symptom..."
+                  required
+                  value={symptomType}
+                  onChange={handleSymptomTypeChange}
+                  onFocus={() => symptomSuggestions.length > 0 && setShowSymptomSuggestions(true)}
+                />
+                {showSymptomSuggestions && symptomSuggestions.length > 0 && (
+                  <div
+                    className="symptom-suggestions"
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      backgroundColor: 'white',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      zIndex: 1000,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    }}
+                  >
+                    {symptomSuggestions.map((suggestion, index) => (
+                      <div
+                        key={index}
+                        onClick={(e) => handleSelectSymptom(suggestion, e)}
+                        style={{
+                          padding: '10px 15px',
+                          cursor: 'pointer',
+                          borderBottom: index < symptomSuggestions.length - 1 ? '1px solid #f0f0f0' : 'none',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f5f5')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
+                      >
+                        {suggestion}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="form-group">
                 <label>Severity (1-10)</label>
@@ -656,15 +817,50 @@ const Dashboard: React.FC = () => {
               </button>
             </div>
             <form onSubmit={handleAddMedication}>
-              <div className="form-group">
+              <div className="form-group" style={{ position: 'relative' }}>
                 <label>Medication Name</label>
                 <input
                   type="text"
                   placeholder="e.g., Aspirin 81mg"
                   required
                   value={medicationName}
-                  onChange={(e) => setMedicationName(e.target.value)}
+                  onChange={handleMedicationNameChange}
+                  onFocus={() => medicationSuggestions.length > 0 && setShowSuggestions(true)}
                 />
+                {showSuggestions && medicationSuggestions.length > 0 && (
+                  <div
+                    className="medication-suggestions"
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      backgroundColor: 'white',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      zIndex: 1000,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    }}
+                  >
+                    {medicationSuggestions.map((suggestion, index) => (
+                      <div
+                        key={index}
+                        onClick={(e) => handleSelectSuggestion(suggestion, e)}
+                        style={{
+                          padding: '10px 15px',
+                          cursor: 'pointer',
+                          borderBottom: index < medicationSuggestions.length - 1 ? '1px solid #f0f0f0' : 'none',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f5f5')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
+                      >
+                        {suggestion}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="form-group">
                 <label>Frequency</label>
