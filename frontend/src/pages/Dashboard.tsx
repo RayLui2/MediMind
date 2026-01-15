@@ -219,7 +219,7 @@ const Dashboard: React.FC = () => {
   const handleAddSymptom = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await dashboardService.createSymptom({
+      const newSymptom = await dashboardService.createSymptom({
         symptom_type: symptomType,
         severity: severityValue,
         notes: symptomNotes || undefined,
@@ -230,7 +230,10 @@ const Dashboard: React.FC = () => {
       setSymptomNotes('');
       setSymptomSuggestions([]);
       setShowSymptomSuggestions(false);
-      await fetchDashboardData();
+      // Update only symptoms state and summary
+      setSymptoms(prev => [newSymptom, ...prev]);
+      const newSummary = await dashboardService.getDashboardSummary();
+      setSummary(newSummary);
     } catch (error) {
       console.error('Error adding symptom:', error);
       alert('Failed to add symptom');
@@ -322,7 +325,7 @@ const Dashboard: React.FC = () => {
         notes: medicationNotes || undefined,
       };
       console.log('Sending medication payload:', payload);
-      await dashboardService.createMedication(payload);
+      const newMedication = await dashboardService.createMedication(payload);
       setMedicationModalOpen(false);
       setMedicationName('');
       setMedicationFrequency('');
@@ -330,7 +333,10 @@ const Dashboard: React.FC = () => {
       setMedicationNotes('');
       setMedicationSuggestions([]);
       setShowSuggestions(false);
-      await fetchDashboardData();
+      // Update only medications state and summary
+      setMedications(prev => [...prev, newMedication]);
+      const newSummary = await dashboardService.getDashboardSummary();
+      setSummary(newSummary);
     } catch (error: any) {
       console.error('Error adding medication:', error);
       console.error('Error response data:', error.response?.data);
@@ -349,7 +355,9 @@ const Dashboard: React.FC = () => {
       await dashboardService.logMedicationTaken(medicationId);
       // Optimistically update UI
       setMedicationsTakenToday(prev => new Set(prev).add(medicationId));
-      await fetchDashboardData();
+      // Update only summary to reflect medications taken today
+      const newSummary = await dashboardService.getDashboardSummary();
+      setSummary(newSummary);
     } catch (error: any) {
       console.error('Error logging medication:', error);
       if (error.response?.status === 400) {
@@ -358,7 +366,11 @@ const Dashboard: React.FC = () => {
       } else {
         alert('Failed to log medication');
       }
-      await fetchDashboardData(); // Refresh to ensure correct state
+      // Refresh medications taken list and summary to ensure correct state
+      const takenToday = await dashboardService.getTodaysMedicationLogs();
+      setMedicationsTakenToday(new Set(takenToday));
+      const newSummary = await dashboardService.getDashboardSummary();
+      setSummary(newSummary);
     }
   };
 
@@ -366,7 +378,7 @@ const Dashboard: React.FC = () => {
   const handleAddVitalSign = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await dashboardService.createVitalSign({
+      const newVitalSign = await dashboardService.createVitalSign({
         systolic_bp: systolicBP ? parseInt(systolicBP) : undefined,
         diastolic_bp: diastolicBP ? parseInt(diastolicBP) : undefined,
         heart_rate: heartRate ? parseInt(heartRate) : undefined,
@@ -377,7 +389,11 @@ const Dashboard: React.FC = () => {
       setDiastolicBP('');
       setHeartRate('');
       setWeight('');
-      await fetchDashboardData();
+      // Update only vital signs state and summary
+      // Add new vital sign at the beginning (most recent first)
+      setVitalSigns(prev => [newVitalSign, ...prev]);
+      const newSummary = await dashboardService.getDashboardSummary();
+      setSummary(newSummary);
     } catch (error) {
       console.error('Error adding vital sign:', error);
       alert('Failed to add vital sign');
@@ -396,14 +412,18 @@ const Dashboard: React.FC = () => {
         family_history: profileFamilyHistory ? profileFamilyHistory.split(',').map((s) => s.trim()) : [],
       };
 
+      let updatedProfile;
       if (healthProfile) {
-        await dashboardService.updateHealthProfile(profileData);
+        updatedProfile = await dashboardService.updateHealthProfile(profileData);
       } else {
-        await dashboardService.createHealthProfile(profileData);
+        updatedProfile = await dashboardService.createHealthProfile(profileData);
       }
 
       setHealthProfileModalOpen(false);
-      await fetchDashboardData();
+      // Update only health profile state and summary (summary includes latest weight)
+      setHealthProfile(updatedProfile);
+      const newSummary = await dashboardService.getDashboardSummary();
+      setSummary(newSummary);
     } catch (error) {
       console.error('Error updating health profile:', error);
       alert('Failed to update health profile');
