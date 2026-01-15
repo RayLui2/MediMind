@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import './Header.css'
 
 const Header: React.FC = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, logout } = useAuth()
   const [showDropdown, setShowDropdown] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -42,6 +43,32 @@ const Header: React.FC = () => {
     navigate('/')
   }
 
+  const handleAboutClick = () => {
+    // If we're already on the home page, scroll directly
+    if (location.pathname === '/') {
+      const aboutSection = document.getElementById('about')
+      if (aboutSection) {
+        aboutSection.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        })
+      }
+    } else {
+      // Navigate to home page, then scroll to about section
+      navigate('/')
+      // Wait for navigation and DOM to be ready before scrolling
+      setTimeout(() => {
+        const aboutSection = document.getElementById('about')
+        if (aboutSection) {
+          aboutSection.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          })
+        }
+      }, 100)
+    }
+  }
+
   const handleLogoutClick = () => {
     logout()
     navigate('/login')
@@ -62,7 +89,9 @@ const Header: React.FC = () => {
         <a onClick={handleHomeClick} style={{ cursor: 'pointer' }}>
           Home
         </a>
-        <a href="#about">About</a>
+        <a onClick={handleAboutClick} style={{ cursor: 'pointer' }}>
+          About
+        </a>
         <a onClick={handleChatClick} style={{ cursor: 'pointer' }}>
           Chat
         </a>
