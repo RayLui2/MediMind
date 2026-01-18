@@ -54,6 +54,22 @@ const Dashboard: React.FC = () => {
   const [profileAllergies, setProfileAllergies] = useState('');
   const [profileFamilyHistory, setProfileFamilyHistory] = useState('');
 
+  // Form states for BMR calculator modal
+  const [bmrModalOpen, setBmrModalOpen] = useState(false);
+  const [bmrGender, setBmrGender] = useState<'male' | 'female' | ''>('');
+  const [bmrWeight, setBmrWeight] = useState('');
+  const [bmrHeightFeet, setBmrHeightFeet] = useState('');
+  const [bmrHeightInches, setBmrHeightInches] = useState('');
+  const [bmrAge, setBmrAge] = useState('');
+  const [bmrResult, setBmrResult] = useState<number | null>(null);
+
+  // Form states for BMI calculator modal
+  const [bmiModalOpen, setBmiModalOpen] = useState(false);
+  const [bmiWeight, setBmiWeight] = useState('');
+  const [bmiHeightFeet, setBmiHeightFeet] = useState('');
+  const [bmiHeightInches, setBmiHeightInches] = useState('');
+  const [bmiResult, setBmiResult] = useState<number | null>(null);
+
   // Loading state
   const [loading, setLoading] = useState(true);
 
@@ -442,6 +458,53 @@ const Dashboard: React.FC = () => {
     setHealthProfileModalOpen(true);
   };
 
+  const calculateBMR = () => {
+    if (!bmrGender || !bmrWeight || !bmrHeightFeet || !bmrAge) return;
+  
+    const weight = parseFloat(bmrWeight);
+    const feet = parseFloat(bmrHeightFeet);
+    const inches = bmrHeightInches ? parseFloat(bmrHeightInches) : 0;
+    const age = parseFloat(bmrAge);
+  
+    // Convert feet and inches to total inches, then to cm
+    const totalInches = (feet * 12) + inches;
+    const weightKg = weight * 0.453592;
+    const heightCm = totalInches * 2.54;
+  
+    // Mifflin-St Jeor Equation
+    let bmr;
+    if (bmrGender === 'male') {
+      bmr = (10 * weightKg) + (6.25 * heightCm) - (5 * age) + 5;
+    } else {
+      bmr = (10 * weightKg) + (6.25 * heightCm) - (5 * age) - 161;
+    }
+  
+    setBmrResult(Math.round(bmr));
+  };
+
+  const calculateBMI = () => {
+    if (!bmiWeight || !bmiHeightFeet) return;
+  
+    const weight = parseFloat(bmiWeight);
+    const feet = parseFloat(bmiHeightFeet);
+    const inches = bmiHeightInches ? parseFloat(bmiHeightInches) : 0;
+  
+    // Convert feet and inches to total inches
+    const totalInches = (feet * 12) + inches;
+  
+    // BMI formula: (weight in lbs × 703) / (height in inches)²
+    const bmi = (weight * 703) / (totalInches * totalInches);
+  
+    setBmiResult(parseFloat(bmi.toFixed(1)));
+  };
+
+  const getBMICategory = (bmi: number): { category: string; color: string } => {
+    if (bmi < 18.5) return { category: 'Underweight', color: '#5DD3C6' };
+    if (bmi < 25) return { category: 'Normal weight', color: '#4CAF50' };
+    if (bmi < 30) return { category: 'Overweight', color: '#FFA726' };
+    return { category: 'Obese', color: '#EF5350' };
+  };
+
   const openCalculator = (type: string) => {
     alert(`${type.toUpperCase()} Calculator would open here. This would be a separate modal with calculator inputs.`);
   };
@@ -589,11 +652,11 @@ const Dashboard: React.FC = () => {
                   <div className="calculator-icon">⚠️</div>
                   <div className="calculator-name">Health Risk</div>
                 </div>
-                <div className="calculator-card" onClick={() => openCalculator('bmi')}>
+                <div className="calculator-card" onClick={() => setBmiModalOpen(true)}>
                   <div className="calculator-icon">📏</div>
                   <div className="calculator-name">BMI Calculator</div>
                 </div>
-                <div className="calculator-card" onClick={() => openCalculator('bmr')}>
+                <div className="calculator-card" onClick={() => setBmrModalOpen(true)}>
                   <div className="calculator-icon">🔥</div>
                   <div className="calculator-name">BMR Calculator</div>
                 </div>
@@ -1049,6 +1112,301 @@ const Dashboard: React.FC = () => {
                 {healthProfile ? 'Update' : 'Create'} Profile
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* BMR Calculator Modal */}
+      {bmrModalOpen && (
+        <div
+          className="modal active"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setBmrModalOpen(false);
+          }}
+        >
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3 className="modal-title">BMR Calculator</h3>
+              <button className="close-btn" onClick={() => setBmrModalOpen(false)}>
+                ×
+              </button>
+            </div>
+            <div style={{ padding: '1.5rem 0' }}>
+              {/* Gender Selection */}
+              <div className="form-group">
+                <label style={{ marginBottom: '0.5rem', display: 'block' }}>Gender</label>
+                <div style={{ 
+                  display: 'flex', 
+                  gap: '0',
+                  border: '2px solid #e0e0e0',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  width: 'fit-content'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => setBmrGender('male')}
+                    style={{
+                      padding: '0.75rem 2rem',
+                      border: 'none',
+                      backgroundColor: bmrGender === 'male' ? '#2E5EAA' : 'white',
+                      color: bmrGender === 'male' ? 'white' : '#666',
+                      cursor: 'pointer',
+                      fontSize: '1rem',
+                      fontWeight: bmrGender === 'male' ? '600' : '400',
+                      transition: 'all 0.2s ease',
+                      borderRight: '1px solid #e0e0e0'
+                    }}
+                  >
+                    Male
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBmrGender('female')}
+                    style={{
+                      padding: '0.75rem 2rem',
+                      border: 'none',
+                      backgroundColor: bmrGender === 'female' ? '#2E5EAA' : 'white',
+                      color: bmrGender === 'female' ? 'white' : '#666',
+                      cursor: 'pointer',
+                      fontSize: '1rem',
+                      fontWeight: bmrGender === 'female' ? '600' : '400',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    Female
+                  </button>
+                </div>
+              </div>
+
+              {/* Weight Input */}
+              <div className="form-group">
+                <label>Weight (lbs)</label>
+                <input
+                  type="number"
+                  placeholder="e.g., 165"
+                  value={bmrWeight}
+                  onChange={(e) => setBmrWeight(e.target.value)}
+                  min="0"
+                  step="1"
+                />
+              </div>
+
+              {/* Height Input */}
+              <div className="form-group">
+                <label>Height</label>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      type="number"
+                      placeholder="Feet"
+                      value={bmrHeightFeet}
+                      onChange={(e) => setBmrHeightFeet(e.target.value)}
+                      min="0"
+                      max="8"
+                      step="1"
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      type="number"
+                      placeholder="Inches"
+                      value={bmrHeightInches}
+                      onChange={(e) => setBmrHeightInches(e.target.value)}
+                      min="0"
+                      max="11"
+                      step="1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Age Input */}
+              <div className="form-group">
+                <label>Age (years)</label>
+                <input
+                  type="number"
+                  placeholder="e.g., 30"
+                  value={bmrAge}
+                  onChange={(e) => setBmrAge(e.target.value)}
+                  min="0"
+                  step="1"
+                />
+              </div>
+
+              {/* BMR Result */}
+              {bmrResult && (
+                <div style={{
+                  marginTop: '1.5rem',
+                  padding: '1.5rem',
+                  backgroundColor: '#f0f7ff',
+                  borderRadius: '8px',
+                  textAlign: 'center',
+                  border: '2px solid #2E5EAA'
+                }}>
+                  <p style={{ 
+                    fontSize: '0.9rem', 
+                    color: '#666', 
+                    marginBottom: '0.5rem',
+                    fontWeight: '500'
+                  }}>
+                    Your Basal Metabolic Rate is:
+                  </p>
+                  <p style={{ 
+                    fontSize: '2rem', 
+                    fontWeight: '700', 
+                    color: '#2E5EAA',
+                    margin: '0'
+                  }}>
+                    {bmrResult} calories/day
+                  </p>
+                  <p style={{ 
+                    fontSize: '0.8rem', 
+                    color: '#888', 
+                    marginTop: '0.75rem',
+                    fontStyle: 'italic'
+                  }}>
+                    This is the number of calories your body burns at rest
+                  </p>
+                </div>
+              )}
+            </div>
+            <button 
+              type="button" 
+              className="submit-btn"
+              onClick={calculateBMR}
+              disabled={!bmrGender || !bmrWeight || !bmrHeightFeet || !bmrAge}
+              style={{
+                opacity: (!bmrGender || !bmrWeight || !bmrHeightFeet || !bmrAge) ? 0.5 : 1,
+                cursor: (!bmrGender || !bmrWeight || !bmrHeightFeet || !bmrAge) ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Calculate BMR
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* BMI Calculator Modal */}
+      {bmiModalOpen && (
+        <div
+          className="modal active"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setBmiModalOpen(false);
+          }}
+        >
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3 className="modal-title">BMI Calculator</h3>
+              <button className="close-btn" onClick={() => setBmiModalOpen(false)}>
+                ×
+              </button>
+            </div>
+            <div style={{ padding: '1.5rem 0' }}>
+              {/* Weight Input */}
+              <div className="form-group">
+                <label>Weight (lbs)</label>
+                <input
+                  type="number"
+                  placeholder="e.g., 165"
+                  value={bmiWeight}
+                  onChange={(e) => setBmiWeight(e.target.value)}
+                  min="0"
+                  step="1"
+                />
+              </div>
+
+              {/* Height Input */}
+              <div className="form-group">
+                <label>Height</label>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      type="number"
+                      placeholder="Feet"
+                      value={bmiHeightFeet}
+                      onChange={(e) => setBmiHeightFeet(e.target.value)}
+                      min="0"
+                      max="8"
+                      step="1"
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      type="number"
+                      placeholder="Inches"
+                      value={bmiHeightInches}
+                      onChange={(e) => setBmiHeightInches(e.target.value)}
+                      min="0"
+                      max="11"
+                      step="1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* BMI Result */}
+              {bmiResult && (
+                <div style={{
+                  marginTop: '1.5rem',
+                  padding: '1.5rem',
+                  backgroundColor: '#f0f7ff',
+                  borderRadius: '8px',
+                  textAlign: 'center',
+                  border: '2px solid #2E5EAA'
+                }}>
+                  <p style={{ 
+                    fontSize: '0.9rem', 
+                    color: '#666', 
+                    marginBottom: '0.5rem',
+                    fontWeight: '500'
+                  }}>
+                    Your Body Mass Index is:
+                  </p>
+                  <p style={{ 
+                    fontSize: '2.5rem', 
+                    fontWeight: '700', 
+                    color: '#2E5EAA',
+                    margin: '0.25rem 0'
+                  }}>
+                    {bmiResult}
+                  </p>
+                  <p style={{ 
+                    fontSize: '1.1rem', 
+                    fontWeight: '600', 
+                    color: getBMICategory(bmiResult).color,
+                    marginTop: '0.5rem'
+                  }}>
+                    {getBMICategory(bmiResult).category}
+                  </p>
+                  <div style={{
+                    marginTop: '1rem',
+                    paddingTop: '1rem',
+                    borderTop: '1px solid #e0e0e0',
+                    fontSize: '0.8rem',
+                    color: '#666',
+                    textAlign: 'left'
+                  }}>
+                    <p style={{ margin: '0.25rem 0' }}>• Underweight: Below 18.5</p>
+                    <p style={{ margin: '0.25rem 0' }}>• Normal weight: 18.5 - 24.9</p>
+                    <p style={{ margin: '0.25rem 0' }}>• Overweight: 25 - 29.9</p>
+                    <p style={{ margin: '0.25rem 0' }}>• Obese: 30 and above</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            <button 
+              type="button" 
+              className="submit-btn"
+              onClick={calculateBMI}
+              disabled={!bmiWeight || !bmiHeightFeet}
+              style={{
+                opacity: (!bmiWeight || !bmiHeightFeet) ? 0.5 : 1,
+                cursor: (!bmiWeight || !bmiHeightFeet) ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Calculate BMI
+            </button>
           </div>
         </div>
       )}
