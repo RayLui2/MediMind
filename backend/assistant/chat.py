@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langgraph.graph import END, StateGraph
 from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.prebuilt import ToolNode
 
 # Local imports
 from assistant.models.chat import ChatMessage
@@ -16,6 +17,8 @@ from assistant.state import State
 from assistant.system_prompt import system_prompt
 from app.models.conversations import Conversation
 
+from assistant.tools.update_instructions import update_instructions
+
 # Database imports
 from app.database import get_db
 from app.models.message import Message
@@ -24,21 +27,35 @@ from app.models.message import Message
 assistant_graph_builder = StateGraph(State)
 
 # --- Create Nodes ---
+tools = [update_instructions]
+tool_node = ToolNode(tools)
 chatbot_node = create_chatbot_node()
 summarizer_node = create_summarizer_node()
 
+def fanout_node(state: State):
+    """Pass-through node that triggers parallel execution"""
+    return state
+
 # --- Add Nodes ---
+assistant_graph_builder.add_node("fanout", fanout_node)
 assistant_graph_builder.add_node("chatbot", chatbot_node)
 assistant_graph_builder.add_node("summarizer", summarizer_node)
+assistant_graph_builder.add_node("tools", tool_node)
 
 # --- Set Entry Point ---
-assistant_graph_builder.set_entry_point("summarizer")
+# assistant_graph_builder.set_entry_point("summarizer")
+assistant_graph_builder.set_entry_point("fanout")
 
 # --- Add Edges ---
-# Summarizer always goes to chatbot after generating summary
-assistant_graph_builder.add_edge("summarizer", "chatbot")
+# Fanout branches to both summarizer and tools
+assistant_graph_builder.add_edge("fanout", "summarizer")
+assistant_graph_builder.add_edge("fanout", "tools")
 
-# Chatbot goes to END
+# Tools leads to chatbot
+assistant_graph_builder.add_edge("tools", "chatbot")
+
+# Both summarizer and chatbot end independently
+assistant_graph_builder.add_edge("summarizer", END)
 assistant_graph_builder.add_edge("chatbot", END)
 
 

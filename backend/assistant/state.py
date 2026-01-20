@@ -18,8 +18,14 @@ class State(BaseModel):
     # User profile data
     user_data: Optional[dict] = None
 
+    # persistent user rules for the assistant
+    user_instructions: Optional[dict] = None   # e.g. {instructions: {"bullet_points", "concise"}}
+
     # Optional: database history (or load this IN a node instead)
-    chat_history: Annotated[List[ChatMessage], lambda curr_history, new_chats: curr_history + new_chats] = []
+    chat_history: Annotated[
+        List[ChatMessage],
+        lambda curr_history, new_chats: curr_history + new_chats
+    ] = []
 
     # Summary of the first message in the conversation
     conversation_title: Optional[str] = "New Chat"

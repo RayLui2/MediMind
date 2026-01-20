@@ -17,6 +17,7 @@ from app.schemas.chat import (
 )
 from app.utils.security import verify_token
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 security = HTTPBearer()
@@ -77,6 +78,7 @@ async def stream_chat_message(
         # Create new conversation
         conversation = Conversation(
             user_id=user.id,
+            instructions=[]
         )
         db.add(conversation)
         db.commit()
@@ -116,6 +118,48 @@ async def stream_chat_message(
             import traceback
             traceback.print_exc()
 
+    def update_instructions(user_message: str, instructions: List[str]) -> List[str]:
+        print(f"Updating instructions with user message: {user_message}", flush=True)
+
+        class InstructionsResponse(BaseModel):
+            instructions: List[str] = Field(
+                description="List of instruction strings extracted from the user message"
+            )
+
+        from langchain.chat_models import init_chat_model
+        llm = init_chat_model(
+            os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+            model_provider="google_genai",
+            api_key=os.getenv("GEMINI_API_KEY"),
+            temperature=0.0,
+        )
+
+        structured_llm = llm.with_structured_output(InstructionsResponse)
+
+        prompt = f"""
+Current instructions: {instructions}
+
+Analyze the user's message and extract any instructions about how they want responses formatted or delivered.
+Update the full list (add new instructions, remove ones that are no longer needed).
+
+Examples of instructions:
+- "bullet_points" (user wants bullet point format)
+- "concise" (user wants brief responses)
+- "detailed" (user wants detailed explanations)
+- "step_by_step" (user wants step-by-step guidance)
+
+Return an empty list if no instructions are found.
+"""
+        response = structured_llm.invoke([
+            SystemMessage(content=prompt),
+            HumanMessage(content=user_message),
+        ])
+
+        print(f"Old instructions: {instructions}", flush=True)
+        print(f"New instructions: {response.instructions}", flush=True)
+
+        return response.instructions
+
     # Create async generator for SSE format
     async def event_generator():
         full_response = ""
@@ -128,6 +172,7 @@ async def stream_chat_message(
             "type": "metadata",
             "conversation_id": conversation.id,
             "user_message_id": user_message.id,
+            "instructions": conversation.instructions,
             "conversation_title": conversation.title
         }
         yield f"data: {json.dumps(metadata)}\n\n"
@@ -142,14 +187,29 @@ async def stream_chat_message(
 
         db_messages = list(reversed(db_messages))
 
+        instructions = metadata["instructions"] if metadata["instructions"] else []
+
         if db_messages:
+            messages.append(SystemMessage(content=system_prompt))
+            if instructions:
+                messages[0] = SystemMessage(content=f"{system_prompt}\nUser instructions:\n{instructions}")
             for msg in db_messages:
                 if msg.role == "user":
                     messages.append(HumanMessage(content=msg.content))
                 elif msg.role == "assistant":
                     messages.append(AIMessage(content=msg.content))
         else:
-            messages.append(SystemMessage(content=system_prompt))
+            messages.append(SystemMessage(content=f"{system_prompt}\n{instructions}"))
+
+        updated_instructions = update_instructions(messages[-1].content, instructions)
+        if instructions != updated_instructions:
+            messages[0] = SystemMessage(content=f"{system_prompt}\n{updated_instructions}")
+            metadata["instructions"] = updated_instructions
+
+            conversation.instructions = updated_instructions
+            db.add(conversation)
+            db.commit()
+            db.refresh(conversation)
 
         # Add user info to current message if available
         if user.name or user.age:
@@ -166,7 +226,7 @@ User message:
             messages.append(HumanMessage(content=message.content))
 
         # Stream directly from LLM (bypass LangGraph for streaming)
-        try:
+        try:           
             # Initialize LLM
             from langchain.chat_models import init_chat_model
             llm = init_chat_model(
