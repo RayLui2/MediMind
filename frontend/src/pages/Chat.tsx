@@ -96,8 +96,13 @@ const Chat: React.FC = () => {
     const tempAssistantId = `temp-${Date.now()}`
 
     try {
+      // Add conversation ID to URL if it exists
+      const conversationIdParam = currentConversation?.id 
+        ? `?conversation_id=${currentConversation.id}` 
+        : '';
+
       // Make fetch request
-      const response = await fetch(`${API_URL}/chat/stream`, {
+      const response = await fetch(`${API_URL}/chat/stream${conversationIdParam}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
