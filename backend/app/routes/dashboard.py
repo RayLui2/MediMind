@@ -1,23 +1,33 @@
+# Standard library
+from datetime import date, datetime, timedelta
+from typing import List
+
+# Third-party
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
-from datetime import datetime, date, timedelta
 
+# Local
 from app.database import get_db
-from app.models.user import User
 from app.models.health_profile import HealthProfile
 from app.models.medication import Medication, MedicationLog
 from app.models.symptom import Symptom
+from app.models.user import User
 from app.models.vital_sign import VitalSign
-from app.schemas.dashboard import (
-    HealthProfileCreate, HealthProfileUpdate, HealthProfileResponse,
-    MedicationCreate, MedicationUpdate, MedicationResponse,
-    MedicationLogResponse,
-    SymptomCreate, SymptomResponse,
-    VitalSignCreate, VitalSignResponse,
-    DashboardSummary
-)
 from app.routes.auth import get_current_user
+from app.schemas.dashboard import (
+    DashboardSummary,
+    HealthProfileCreate,
+    HealthProfileResponse,
+    HealthProfileUpdate,
+    MedicationCreate,
+    MedicationLogResponse,
+    MedicationResponse,
+    MedicationUpdate,
+    SymptomCreate,
+    SymptomResponse,
+    VitalSignCreate,
+    VitalSignResponse,
+)
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 

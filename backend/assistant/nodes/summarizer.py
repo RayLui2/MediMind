@@ -1,7 +1,12 @@
-from assistant.state import State
+# Standard library
+import os
+
+# Third-party
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage
-import os
+
+# Local
+from assistant.state import State
 
 def create_summarizer_node():
     """Create a node that generates a concise title from the first message"""

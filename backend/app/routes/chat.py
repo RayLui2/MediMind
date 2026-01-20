@@ -1,23 +1,28 @@
+# Standard library
+import asyncio
 import json
 import os
-from assistant.system_prompt import system_prompt
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+import traceback
 from typing import List
+
+# Third-party
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from langchain.chat_models import init_chat_model
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from sqlalchemy.orm import Session
+
+# Local
 from app.database import get_db
-from app.models.user import User
 from app.models.conversations import Conversation
 from app.models.message import Message
-from app.schemas.chat import (
-    MessageCreate,
-    ConversationResponse,
-    ConversationWithMessages,
-    MessageResponse
-)
+from app.models.user import User
+from app.schemas.chat import ConversationResponse, ConversationWithMessages, MessageCreate, MessageResponse
 from app.services.chat_service import update_instructions
 from app.utils.security import verify_token
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from assistant.chat import assistant_graph
+from assistant.system_prompt import system_prompt
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 security = HTTPBearer()
@@ -60,8 +65,6 @@ async def stream_chat_message(
     If conversation_id is provided, adds to existing conversation.
     Otherwise, creates a new conversation.
     """
-    from fastapi.responses import StreamingResponse
-
     # Get or create conversation
     if conversation_id:
         conversation = db.query(Conversation).filter(
@@ -97,8 +100,6 @@ async def stream_chat_message(
     # Generate title using LangGraph summarizer for new conversations
     if not conversation_id and conversation.title == "New Chat":  # Only for new conversations
         try:
-            from assistant.chat import assistant_graph
-
             config = {"configurable": {"thread_id": f"conversation_{conversation.id}"}}
 
             # Run just the summarizer node to get the title
@@ -115,7 +116,6 @@ async def stream_chat_message(
 
         except Exception as e:
             print(f"Error generating title with LangGraph: {str(e)}", flush=True)
-            import traceback
             traceback.print_exc()
 
     # Create async generator for SSE format
@@ -186,7 +186,6 @@ User message:
         # Stream directly from LLM (bypass LangGraph for streaming)
         try:           
             # Initialize LLM
-            from langchain.chat_models import init_chat_model
             llm = init_chat_model(
                 os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
                 model_provider="google_genai",
@@ -196,7 +195,6 @@ User message:
 
             # Stream tokens from LLM
             chunk_count = 0
-            import asyncio
 
             for chunk in llm.stream(messages):
                 if hasattr(chunk, 'content') and chunk.content:
@@ -218,7 +216,6 @@ User message:
 
         except Exception as e:
             print(f"Error in streaming: {str(e)}")
-            import traceback
             traceback.print_exc()
             error_data = {"type": "error", "message": str(e)}
             yield f"data: {json.dumps(error_data)}\n\n"

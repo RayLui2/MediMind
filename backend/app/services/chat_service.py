@@ -1,17 +1,19 @@
-from typing import List
-from pydantic import BaseModel, Field
-from langchain_core.messages import SystemMessage, HumanMessage
+# Standard library
 import os
+from typing import List
+
+# Third-party
+from langchain.chat_models import init_chat_model
+from langchain_core.messages import HumanMessage, SystemMessage
+from pydantic import BaseModel, Field
+
 
 def update_instructions(user_message: str, instructions: List[str]) -> List[str]:
-        print(f"Updating instructions with user message: {user_message}", flush=True)
-
         class InstructionsResponse(BaseModel):
             instructions: List[str] = Field(
                 description="List of instruction strings extracted from the user message"
             )
 
-        from langchain.chat_models import init_chat_model
         llm = init_chat_model(
             os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
             model_provider="google_genai",
@@ -39,8 +41,5 @@ Return an empty list if no instructions are found.
             SystemMessage(content=prompt),
             HumanMessage(content=user_message),
         ])
-
-        print(f"Old instructions: {instructions}", flush=True)
-        print(f"New instructions: {response.instructions}", flush=True)
 
         return response.instructions

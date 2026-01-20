@@ -1,10 +1,16 @@
-from assistant.state import State
-from langchain.chat_models import init_chat_model
+# Standard library
 import os
-from langchain_core.messages import HumanMessage
-from assistant.models.chat import ChatMessage
-from assistant.system_prompt import system_prompt
+
+# Third-party
 from dotenv import load_dotenv
+from langchain.chat_models import init_chat_model
+from langchain_core.messages import AIMessage, HumanMessage
+
+# Local
+from assistant.models.chat import ChatMessage
+from assistant.state import State
+from assistant.system_prompt import system_prompt
+
 load_dotenv()
 
 def create_chatbot_node():
@@ -41,7 +47,6 @@ User message:\n{original_content}
                 full_content += chunk.content
 
         # Create complete AIMessage for state management
-        from langchain_core.messages import AIMessage
         response = AIMessage(content=full_content)
 
         return {"messages": [response], "chat_history": [ChatMessage(role="assistant", content=response.content)]}

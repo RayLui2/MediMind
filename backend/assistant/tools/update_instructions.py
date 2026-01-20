@@ -1,13 +1,18 @@
+# Standard library
 import json
+import os
+from typing import Annotated, List
+
+# Third-party
+from langchain.chat_models import init_chat_model
 from langchain.tools import tool
 from langchain_core.messages import HumanMessage, SystemMessage
-from langgraph.types import Command
-from typing import Annotated
 from langchain_core.tools.base import InjectedToolCallId
-from assistant.state import State
+from langgraph.types import Command
 from pydantic import BaseModel, Field
-from langchain.chat_models import init_chat_model
-import os
+
+# Local
+from assistant.state import State
 
 class UpdateInstructionsTool(BaseModel):
     instructions: dict = Field(description="The instructions to update")
@@ -16,6 +21,7 @@ class UpdateInstructionsTool(BaseModel):
 def update_instructions(
     tool_call_id: Annotated[str, InjectedToolCallId],
     state: State,
+    instructions: List[str]
 ) -> Command:
     """Update the user instructions"""
 
@@ -27,24 +33,22 @@ def update_instructions(
     )
 
     prompt = f"""
-find instructions in the user prompt, and return a json object with the instructions.
+Current instructions: {instructions}
 
-Example:
-user prompt: "I want the answer in bullet point format, and in a concise manner"
+Analyze the user's message and extract any instructions about how they want responses formatted or delivered.
+Update the full list (add new instructions, remove ones that are no longer needed).
 
-Return: {{"instructions": {{"bullet_points": true, "concise": true}}}}
-    """
+Examples of instructions:
+- "bullet_points" (user wants bullet point format)
+- "concise" (user wants brief responses)
+- "detailed" (user wants detailed explanations)
+- "step_by_step" (user wants step-by-step guidance)
+
+Return an empty list if no instructions are found.
+"""
     response = llm.invoke([
         HumanMessage(content=state.messages[-1].content),
         SystemMessage(content=prompt),
     ])
-    instructions = response.content.strip()
-    instructions = json.loads(instructions)["instructions"]
-
-    print(f"Instructions: {instructions}")
-
-    return Command(
-        update = {
-            "user_instructions": instructions
-        }
-    )
+    
+    return response.instructions

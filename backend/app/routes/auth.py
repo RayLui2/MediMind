@@ -1,11 +1,14 @@
+# Third-party
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
+
+# Local
 from app.database import get_db
 from app.models.user import User
-from app.schemas.auth import SignUpRequest, LoginRequest, Token
+from app.schemas.auth import LoginRequest, SignUpRequest, Token
 from app.schemas.user import UserResponse
-from app.utils.security import hash_password, verify_password, create_access_token, verify_token
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from app.utils.security import create_access_token, hash_password, verify_password, verify_token
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 security = HTTPBearer()
