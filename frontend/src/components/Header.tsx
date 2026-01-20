@@ -40,7 +40,29 @@ const Header: React.FC = () => {
   }
 
   const handleHomeClick = () => {
-    navigate('/')
+    // If we're already on the home page, scroll directly
+    if (location.pathname === '/') {
+      const homeSection = document.getElementById('home')
+      if (homeSection) {
+        homeSection.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        })
+      }
+    } else {
+      // Navigate to home page, then scroll to about section
+      navigate('/')
+      // Wait for navigation and DOM to be ready before scrolling
+      setTimeout(() => {
+        const homeSection = document.getElementById('home')
+        if (homeSection) {
+          homeSection.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          })
+        }
+      }, 100)
+    }
   }
 
   const handleAboutClick = () => {
