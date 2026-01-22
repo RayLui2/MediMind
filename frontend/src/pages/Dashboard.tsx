@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Chart, registerables } from 'chart.js';
 import '../styles/Dashboard.css';
 import * as dashboardService from '../services/dashboardService';
 import { filterSymptoms } from '../data/symptoms';
+import WaterIntakeModal from '../components/WaterIntakeModal';
 
 Chart.register(...registerables);
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const chartRef = useRef<HTMLCanvasElement>(null);
   const chartInstanceRef = useRef<Chart | null>(null);
 
@@ -31,6 +34,7 @@ const Dashboard: React.FC = () => {
   const [medicationModalOpen, setMedicationModalOpen] = useState(false);
   const [vitalSignModalOpen, setVitalSignModalOpen] = useState(false);
   const [healthProfileModalOpen, setHealthProfileModalOpen] = useState(false);
+  const [waterIntakeModalOpen, setWaterIntakeModalOpen] = useState(false);
 
   // Form states for symptom modal
   const [symptomType, setSymptomType] = useState('');
@@ -56,6 +60,7 @@ const Dashboard: React.FC = () => {
   // Form states for health profile modal
   const [profileWeight, setProfileWeight] = useState('');
   const [profileHeight, setProfileHeight] = useState('');
+  const [profileActivityLevel, setProfileActivityLevel] = useState('sedentary');
   const [profileConditions, setProfileConditions] = useState('');
   const [profileAllergies, setProfileAllergies] = useState('');
   const [profileFamilyHistory, setProfileFamilyHistory] = useState('');
@@ -78,6 +83,13 @@ const Dashboard: React.FC = () => {
 
   // Loading state
   const [loading, setLoading] = useState(true);
+
+  // Check if user has completed setup, redirect to /setup if not
+  useEffect(() => {
+    if (user && !user.setup_completed_at) {
+      navigate('/setup', { replace: true });
+    }
+  }, [user, navigate]);
 
   // Fetch all dashboard data
   const fetchDashboardData = async () => {
@@ -562,6 +574,7 @@ const Dashboard: React.FC = () => {
       const profileData = {
         current_weight: profileWeight ? parseInt(profileWeight) : undefined,
         height: profileHeight ? parseInt(profileHeight) : undefined,
+        activity_level: profileActivityLevel,
         current_conditions: profileConditions ? profileConditions.split(',').map((s) => s.trim()) : [],
         allergies: profileAllergies ? profileAllergies.split(',').map((s) => s.trim()) : [],
         family_history: profileFamilyHistory ? profileFamilyHistory.split(',').map((s) => s.trim()) : [],
@@ -590,6 +603,7 @@ const Dashboard: React.FC = () => {
     if (healthProfile) {
       setProfileWeight(healthProfile.current_weight?.toString() || '');
       setProfileHeight(healthProfile.height?.toString() || '');
+      setProfileActivityLevel(healthProfile.activity_level || 'sedentary');
       setProfileConditions(healthProfile.current_conditions.join(', '));
       setProfileAllergies(healthProfile.allergies.join(', '));
       setProfileFamilyHistory(healthProfile.family_history.join(', '));
@@ -645,7 +659,11 @@ const Dashboard: React.FC = () => {
   };
 
   const openCalculator = (type: string) => {
-    alert(`${type.toUpperCase()} Calculator would open here. This would be a separate modal with calculator inputs.`);
+    if (type === 'water') {
+      setWaterIntakeModalOpen(true);
+    } else {
+      alert(`${type.toUpperCase()} Calculator would open here. This would be a separate modal with calculator inputs.`);
+    }
   };
 
   const getSeverityLabel = (severity: number): string => {
@@ -1256,6 +1274,7 @@ const Dashboard: React.FC = () => {
                   placeholder="e.g., 120"
                   value={systolicBP}
                   onChange={(e) => setSystolicBP(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
                 />
               </div>
               <div className="form-group">
@@ -1265,6 +1284,7 @@ const Dashboard: React.FC = () => {
                   placeholder="e.g., 80"
                   value={diastolicBP}
                   onChange={(e) => setDiastolicBP(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
                 />
               </div>
               <div className="form-group">
@@ -1274,6 +1294,7 @@ const Dashboard: React.FC = () => {
                   placeholder="e.g., 72"
                   value={heartRate}
                   onChange={(e) => setHeartRate(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
                 />
               </div>
               <div className="form-group">
@@ -1284,6 +1305,7 @@ const Dashboard: React.FC = () => {
                   placeholder="e.g., 165"
                   value={weight}
                   onChange={(e) => setWeight(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
                 />
               </div>
               <button type="submit" className="submit-btn">
@@ -1318,6 +1340,7 @@ const Dashboard: React.FC = () => {
                   placeholder="e.g., 165"
                   value={profileWeight}
                   onChange={(e) => setProfileWeight(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
                 />
               </div>
               <div className="form-group">
@@ -1328,7 +1351,37 @@ const Dashboard: React.FC = () => {
                   placeholder="e.g., 68"
                   value={profileHeight}
                   onChange={(e) => setProfileHeight(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
                 />
+              </div>
+              <div className="form-group">
+                <label>Activity Level</label>
+                <select
+                  value={profileActivityLevel}
+                  onChange={(e) => setProfileActivityLevel(e.target.value)}
+                  style={{
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    border: '1px solid #e5e7eb',
+                    fontSize: '0.9375rem',
+                    fontFamily: 'DM Sans, sans-serif',
+                    color: '#1a2332',
+                  }}
+                >
+                  <option value="sedentary">Sedentary (little/no exercise)</option>
+                  <option value="lightly_active">Lightly Active (1-3 days/week)</option>
+                  <option value="moderately_active">Moderately Active (3-5 days/week)</option>
+                  <option value="very_active">Very Active (6-7 days/week)</option>
+                  <option value="extremely_active">Extremely Active (physical job + exercise)</option>
+                </select>
+                <span style={{
+                  fontSize: '0.75rem',
+                  color: '#6b7280',
+                  marginTop: '0.25rem',
+                  display: 'block'
+                }}>
+                  Used to calculate daily water intake recommendation
+                </span>
               </div>
               <div className="form-group">
                 <label>Current Conditions (comma-separated)</label>
@@ -1436,6 +1489,7 @@ const Dashboard: React.FC = () => {
                   placeholder="e.g., 165"
                   value={bmrWeight}
                   onChange={(e) => setBmrWeight(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
                   min="0"
                   step="1"
                 />
@@ -1451,6 +1505,7 @@ const Dashboard: React.FC = () => {
                       placeholder="Feet"
                       value={bmrHeightFeet}
                       onChange={(e) => setBmrHeightFeet(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
                       min="0"
                       max="8"
                       step="1"
@@ -1462,6 +1517,7 @@ const Dashboard: React.FC = () => {
                       placeholder="Inches"
                       value={bmrHeightInches}
                       onChange={(e) => setBmrHeightInches(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
                       min="0"
                       max="11"
                       step="1"
@@ -1478,6 +1534,7 @@ const Dashboard: React.FC = () => {
                   placeholder="e.g., 30"
                   value={bmrAge}
                   onChange={(e) => setBmrAge(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
                   min="0"
                   step="1"
                 />
@@ -1560,6 +1617,7 @@ const Dashboard: React.FC = () => {
                   placeholder="e.g., 165"
                   value={bmiWeight}
                   onChange={(e) => setBmiWeight(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
                   min="0"
                   step="1"
                 />
@@ -1575,6 +1633,7 @@ const Dashboard: React.FC = () => {
                       placeholder="Feet"
                       value={bmiHeightFeet}
                       onChange={(e) => setBmiHeightFeet(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
                       min="0"
                       max="8"
                       step="1"
@@ -1586,6 +1645,7 @@ const Dashboard: React.FC = () => {
                       placeholder="Inches"
                       value={bmiHeightInches}
                       onChange={(e) => setBmiHeightInches(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
                       min="0"
                       max="11"
                       step="1"
@@ -1658,6 +1718,11 @@ const Dashboard: React.FC = () => {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Water Intake Modal */}
+      {waterIntakeModalOpen && (
+        <WaterIntakeModal onClose={() => setWaterIntakeModalOpen(false)} />
       )}
     </div>
   );

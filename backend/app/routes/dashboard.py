@@ -13,6 +13,7 @@ from app.models.medication import Medication, MedicationLog
 from app.models.symptom import Symptom
 from app.models.user import User
 from app.models.vital_sign import VitalSign
+from app.models.water_intake import WaterIntake
 from app.routes.auth import get_current_user
 from app.schemas.dashboard import (
     DashboardSummary,
@@ -23,11 +24,17 @@ from app.schemas.dashboard import (
     MedicationLogResponse,
     MedicationResponse,
     MedicationUpdate,
+    SetupCompleteRequest,
+    SetupCompleteResponse,
+    SetupStatusResponse,
     SymptomCreate,
     SymptomResponse,
     SymptomUpdate,
     VitalSignCreate,
     VitalSignResponse,
+    WaterIntakeCreate,
+    WaterIntakeRecommendation,
+    WaterIntakeResponse,
 )
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
@@ -507,4 +514,149 @@ async def get_dashboard_summary(
         latest_weight=latest_weight,
         symptom_count_today=symptom_count_today,
         active_streak_days=active_streak_days
+    )
+
+
+# ============ Setup Flow Routes ============
+@router.post("/setup/complete", response_model=SetupCompleteResponse)
+async def complete_setup(
+    setup_data: SetupCompleteRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Complete first-time user setup.
+    Creates/updates health profile and marks setup as complete.
+    """
+    # Check if user has already completed setup
+    if current_user.setup_completed_at is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Setup already completed. Use PUT /dashboard/health-profile to update your profile."
+        )
+
+    # Create or update health profile
+    existing_profile = db.query(HealthProfile).filter(HealthProfile.user_id == current_user.id).first()
+
+    if existing_profile:
+        # Update existing profile
+        for key, value in setup_data.model_dump(exclude_unset=True).items():
+            setattr(existing_profile, key, value)
+        existing_profile.updated_at = datetime.now()
+    else:
+        # Create new profile
+        profile = HealthProfile(**setup_data.model_dump(), user_id=current_user.id)
+        db.add(profile)
+
+    # Mark setup as complete
+    current_user.setup_completed_at = datetime.now()
+
+    db.commit()
+
+    return SetupCompleteResponse(
+        success=True,
+        message="Setup completed successfully! Welcome to MediMind."
+    )
+
+
+@router.get("/setup/status", response_model=SetupStatusResponse)
+async def get_setup_status(
+    current_user: User = Depends(get_current_user)
+):
+    """Check if user has completed first-time setup"""
+    return SetupStatusResponse(
+        setup_complete=current_user.setup_completed_at is not None,
+        setup_completed_at=current_user.setup_completed_at
+    )
+
+
+# ============ Water Intake Routes ============
+@router.post("/water-intake", response_model=WaterIntakeResponse, status_code=status.HTTP_201_CREATED)
+async def log_water_intake(
+    intake_data: WaterIntakeCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Log water intake for the current user"""
+    water_intake = WaterIntake(**intake_data.model_dump(), user_id=current_user.id)
+    db.add(water_intake)
+    db.commit()
+    db.refresh(water_intake)
+    return water_intake
+
+
+@router.get("/water-intake", response_model=List[WaterIntakeResponse])
+async def get_water_intakes(
+    days: int = 1,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get water intake logs for the past N days (default: today)"""
+    cutoff_date = datetime.now() - timedelta(days=days)
+    intakes = db.query(WaterIntake).filter(
+        WaterIntake.user_id == current_user.id,
+        WaterIntake.consumed_at >= cutoff_date
+    ).order_by(WaterIntake.consumed_at.desc()).all()
+    return intakes
+
+
+@router.delete("/water-intake/{intake_id}")
+async def delete_water_intake(
+    intake_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a water intake log"""
+    intake = db.query(WaterIntake).filter(
+        WaterIntake.id == intake_id,
+        WaterIntake.user_id == current_user.id
+    ).first()
+
+    if not intake:
+        raise HTTPException(status_code=404, detail="Water intake log not found")
+
+    db.delete(intake)
+    db.commit()
+    return {"success": True}
+
+
+@router.get("/water-intake/recommendation", response_model=WaterIntakeRecommendation)
+async def get_water_intake_recommendation(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Calculate recommended daily water intake based on user's profile"""
+    # Get user's health profile
+    profile = db.query(HealthProfile).filter(HealthProfile.user_id == current_user.id).first()
+
+    if not profile or not profile.current_weight:
+        raise HTTPException(
+            status_code=404,
+            detail="Health profile with weight is required for water intake calculation"
+        )
+
+    # Base calculation: weight (lbs) × 0.5 = oz/day
+    base_amount = profile.current_weight * 0.5
+
+    # Activity level adjustments
+    activity_adjustments = {
+        "sedentary": 0,
+        "lightly_active": 12,
+        "moderately_active": 24,
+        "very_active": 36,
+        "extremely_active": 48
+    }
+
+    activity_level = profile.activity_level or "sedentary"
+    activity_adjustment = activity_adjustments.get(activity_level, 0)
+
+    # Total recommendation
+    recommended_oz = base_amount + activity_adjustment
+    cups = recommended_oz / 8  # Convert to cups
+
+    return WaterIntakeRecommendation(
+        recommended_oz=round(recommended_oz, 1),
+        base_amount=round(base_amount, 1),
+        activity_adjustment=activity_adjustment,
+        cups=round(cups, 1)
     )

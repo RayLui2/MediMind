@@ -13,6 +13,7 @@ class User(Base):
     name = Column(String)
     age = Column(Integer)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    setup_completed_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
@@ -21,3 +22,4 @@ class User(Base):
     medication_logs = relationship("MedicationLog", back_populates="user", cascade="all, delete-orphan")
     symptoms = relationship("Symptom", back_populates="user", cascade="all, delete-orphan")
     vital_signs = relationship("VitalSign", back_populates="user", cascade="all, delete-orphan")
+    water_intakes = relationship("WaterIntake", back_populates="user", cascade="all, delete-orphan")

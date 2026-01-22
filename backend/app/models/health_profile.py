@@ -14,6 +14,7 @@ class HealthProfile(Base):
     current_weight = Column(Integer)  # in lbs
     height = Column(Integer)  # in inches
     blood_type = Column(String)
+    activity_level = Column(String)  # sedentary, lightly_active, moderately_active, very_active, extremely_active
 
     # Medical information
     current_conditions = Column(ARRAY(String), default=[])  # ["Hypertension", "Type 2 Diabetes"]
