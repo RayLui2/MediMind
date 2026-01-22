@@ -18,7 +18,13 @@ const Dashboard: React.FC = () => {
   const [symptoms, setSymptoms] = useState<dashboardService.Symptom[]>([]);
   const [vitalSigns, setVitalSigns] = useState<dashboardService.VitalSign[]>([]);
   const [healthProfile, setHealthProfile] = useState<dashboardService.HealthProfile | null>(null);
-  const [medicationsTakenToday, setMedicationsTakenToday] = useState<Set<number>>(new Set());
+  const [medicationsTakenToday, setMedicationsTakenToday] = useState<Map<string, number>>(new Map());
+
+  // Edit states
+  const [editingMedication, setEditingMedication] = useState<dashboardService.Medication | null>(null);
+  const [editingSymptom, setEditingSymptom] = useState<dashboardService.Symptom | null>(null);
+  const [expandedSymptomNotes, setExpandedSymptomNotes] = useState<Set<number>>(new Set());
+  const [expandedMedicationNotes, setExpandedMedicationNotes] = useState<Set<number>>(new Set());
 
   // Modal states
   const [symptomModalOpen, setSymptomModalOpen] = useState(false);
@@ -89,7 +95,14 @@ const Dashboard: React.FC = () => {
       setMedications(medsData);
       setSymptoms(symptomsData);
       setVitalSigns(vitalsData);
-      setMedicationsTakenToday(new Set(takenToday));
+
+      // Populate medication logs map
+      const logMap = new Map<string, number>();
+      takenToday.forEach(log => {
+        const key = `${log.medication_id}-${log.dose_number}`;
+        logMap.set(key, log.log_id);
+      });
+      setMedicationsTakenToday(logMap);
 
       // Try to fetch health profile
       try {
@@ -235,25 +248,87 @@ const Dashboard: React.FC = () => {
   const handleAddSymptom = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const newSymptom = await dashboardService.createSymptom({
-        symptom_type: symptomType,
-        severity: severityValue,
-        notes: symptomNotes || undefined,
-      });
+      if (editingSymptom) {
+        // Update existing symptom
+        const updated = await dashboardService.updateSymptom(editingSymptom.id, {
+          symptom_type: symptomType,
+          severity: severityValue,
+          notes: symptomNotes || undefined,
+        });
+        setSymptoms(prev => prev.map(s => s.id === updated.id ? updated : s));
+      } else {
+        // Create new symptom
+        const newSymptom = await dashboardService.createSymptom({
+          symptom_type: symptomType,
+          severity: severityValue,
+          notes: symptomNotes || undefined,
+        });
+        setSymptoms(prev => [newSymptom, ...prev]);
+        const newSummary = await dashboardService.getDashboardSummary();
+        setSummary(newSummary);
+      }
+
       setSymptomModalOpen(false);
+      setEditingSymptom(null);
       setSymptomType('');
       setSeverityValue(5);
       setSymptomNotes('');
       setSymptomSuggestions([]);
       setShowSymptomSuggestions(false);
-      // Update only symptoms state and summary
-      setSymptoms(prev => [newSymptom, ...prev]);
-      const newSummary = await dashboardService.getDashboardSummary();
-      setSummary(newSummary);
     } catch (error) {
-      console.error('Error adding symptom:', error);
-      alert('Failed to add symptom');
+      console.error('Error adding/updating symptom:', error);
+      alert(`Failed to ${editingSymptom ? 'update' : 'add'} symptom`);
     }
+  };
+
+  // Handle editing symptom
+  const handleEditSymptom = (symptom: dashboardService.Symptom) => {
+    setEditingSymptom(symptom);
+    setSymptomType(symptom.symptom_type);
+    setSeverityValue(symptom.severity);
+    setSymptomNotes(symptom.notes || '');
+    setSymptomModalOpen(true);
+  };
+
+  // Handle deleting symptom
+  const handleDeleteSymptom = async (symptomId: number) => {
+    if (!window.confirm('Delete this symptom entry?')) {
+      return;
+    }
+
+    try {
+      await dashboardService.deleteSymptom(symptomId);
+      setSymptoms(prev => prev.filter(s => s.id !== symptomId));
+    } catch (error) {
+      console.error('Error deleting symptom:', error);
+      alert('Failed to delete symptom');
+    }
+  };
+
+  // Toggle symptom note expansion
+  const toggleSymptomNoteExpansion = (symptomId: number) => {
+    setExpandedSymptomNotes(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(symptomId)) {
+        newSet.delete(symptomId);
+      } else {
+        newSet.add(symptomId);
+      }
+      return newSet;
+    });
+  };
+
+  // Toggle medication note expansion
+  const toggleMedicationNoteExpansion = (medicationId: number) => {
+    setExpandedMedicationNotes(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(medicationId)) {
+        newSet.delete(medicationId);
+      } else {
+        newSet.add(medicationId);
+      }
+      return newSet;
+    });
   };
 
   // Search RxNorm for medication suggestions
@@ -327,7 +402,7 @@ const Dashboard: React.FC = () => {
     setMedicationSuggestions([]);
   };
 
-  // Handle adding medication
+  // Handle adding/updating medication
   const handleAddMedication = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -340,53 +415,117 @@ const Dashboard: React.FC = () => {
         time: medicationTime || undefined,
         notes: medicationNotes || undefined,
       };
-      console.log('Sending medication payload:', payload);
-      const newMedication = await dashboardService.createMedication(payload);
+
+      if (editingMedication) {
+        // Update existing medication
+        const updated = await dashboardService.updateMedication(editingMedication.id, payload);
+        setMedications(prev => prev.map(m => m.id === updated.id ? updated : m));
+      } else {
+        // Create new medication
+        const newMedication = await dashboardService.createMedication(payload);
+        setMedications(prev => [...prev, newMedication]);
+        const newSummary = await dashboardService.getDashboardSummary();
+        setSummary(newSummary);
+      }
+
       setMedicationModalOpen(false);
+      setEditingMedication(null);
       setMedicationName('');
       setMedicationFrequency('');
       setMedicationTime('');
       setMedicationNotes('');
       setMedicationSuggestions([]);
       setShowSuggestions(false);
-      // Update only medications state and summary
-      setMedications(prev => [...prev, newMedication]);
-      const newSummary = await dashboardService.getDashboardSummary();
-      setSummary(newSummary);
     } catch (error: any) {
-      console.error('Error adding medication:', error);
-      console.error('Error response data:', error.response?.data);
-      alert(`Failed to add medication: ${JSON.stringify(error.response?.data?.detail || error.message)}`);
+      console.error('Error adding/updating medication:', error);
+      alert(`Failed to ${editingMedication ? 'update' : 'add'} medication: ${error.response?.data?.detail || error.message}`);
     }
   };
 
-  // Handle logging medication as taken
-  const handleMedicationCheck = async (medicationId: number) => {
-    // Don't allow if already taken today
-    if (medicationsTakenToday.has(medicationId)) {
+  // Handle editing medication
+  const handleEditMedication = (medication: dashboardService.Medication) => {
+    setEditingMedication(medication);
+    setMedicationName(medication.name);
+    setMedicationFrequency(medication.frequency);
+    setMedicationTime(medication.time || '');
+    setMedicationNotes(medication.notes || '');
+    setMedicationModalOpen(true);
+  };
+
+  // Handle deleting medication
+  const handleDeleteMedication = async (medicationId: number) => {
+    if (!window.confirm('Delete this medication? This will also remove all associated logs.')) {
       return;
     }
 
     try {
-      await dashboardService.logMedicationTaken(medicationId);
-      // Optimistically update UI
-      setMedicationsTakenToday(prev => new Set(prev).add(medicationId));
-      // Update only summary to reflect medications taken today
+      await dashboardService.deleteMedication(medicationId);
+      setMedications(prev => prev.filter(m => m.id !== medicationId));
+      const newSummary = await dashboardService.getDashboardSummary();
+      setSummary(newSummary);
+    } catch (error) {
+      console.error('Error deleting medication:', error);
+      alert('Failed to delete medication');
+    }
+  };
+
+  // Get dose count based on frequency
+  const getDoseCount = (frequency: string): number => {
+    switch (frequency) {
+      case 'twice': return 2;
+      case 'daily': return 1;
+      case 'weekly': return 1;
+      case 'asneeded': return 1;
+      default: return 1;
+    }
+  };
+
+  // Get dose label
+  const getDoseLabel = (doseNumber: number, totalDoses: number): string => {
+    if (totalDoses === 1) return '';
+    const ordinals = ['1st', '2nd', '3rd', '4th', '5th'];
+    return ordinals[doseNumber - 1] || `${doseNumber}th`;
+  };
+
+  // Handle logging medication as taken
+  const handleMedicationCheck = async (medicationId: number, doseNumber: number = 1) => {
+    const key = `${medicationId}-${doseNumber}`;
+
+    try {
+      const log = await dashboardService.logMedicationTaken(medicationId, doseNumber);
+      setMedicationsTakenToday(prev => new Map(prev).set(key, log.id));
       const newSummary = await dashboardService.getDashboardSummary();
       setSummary(newSummary);
     } catch (error: any) {
       console.error('Error logging medication:', error);
       if (error.response?.status === 400) {
-        // Already logged today
-        alert('This medication has already been logged for today');
+        alert(error.response.data.detail || `Dose ${doseNumber} already logged for today`);
       } else {
         alert('Failed to log medication');
       }
-      // Refresh medications taken list and summary to ensure correct state
-      const takenToday = await dashboardService.getTodaysMedicationLogs();
-      setMedicationsTakenToday(new Set(takenToday));
+    }
+  };
+
+  // Handle unchecking medication
+  const handleMedicationUncheck = async (
+    logId: number,
+    medicationId: number,
+    doseNumber: number
+  ) => {
+    const key = `${medicationId}-${doseNumber}`;
+
+    try {
+      await dashboardService.deleteMedicationLog(logId);
+      setMedicationsTakenToday(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(key);
+        return newMap;
+      });
       const newSummary = await dashboardService.getDashboardSummary();
       setSummary(newSummary);
+    } catch (error: any) {
+      console.error('Error unchecking medication:', error);
+      alert('Failed to uncheck medication');
     }
   };
 
@@ -618,22 +757,64 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="symptom-list">
                 {symptoms.length > 0 ? (
-                  symptoms.slice(0, 5).map((symptom) => (
-                    <div key={symptom.id} className="symptom-item">
-                      <div className="symptom-info">
-                        <div className="symptom-icon">{getSymptomIcon(symptom.symptom_type)}</div>
-                        <div className="symptom-details">
-                          <h4>{symptom.symptom_type.charAt(0).toUpperCase() + symptom.symptom_type.slice(1)}</h4>
-                          <span className="symptom-time">
-                            {new Date(symptom.created_at).toLocaleString()}
-                          </span>
+                  symptoms.slice(0, 5).map((symptom) => {
+                    const isExpanded = expandedSymptomNotes.has(symptom.id);
+                    const hasNotes = symptom.notes && symptom.notes.length > 0;
+                    const truncatedNotes = hasNotes && symptom.notes!.length > 100
+                      ? symptom.notes!.substring(0, 100) + '...'
+                      : symptom.notes;
+                    const shouldShowExpand = hasNotes && symptom.notes!.length > 100;
+
+                    return (
+                      <div key={symptom.id} className="symptom-item">
+                        <div className="symptom-main">
+                          <div className="symptom-icon">{getSymptomIcon(symptom.symptom_type)}</div>
+                          <div className="symptom-details">
+                            <div className="symptom-header">
+                              <h4>{symptom.symptom_type.charAt(0).toUpperCase() + symptom.symptom_type.slice(1)}</h4>
+                              <span className="symptom-time">
+                                {new Date(symptom.created_at).toLocaleString()}
+                              </span>
+                            </div>
+                            <span className={`severity-badge ${getSeverityLabel(symptom.severity)}`}>
+                              {getSeverityLabel(symptom.severity)}
+                            </span>
+
+                            {hasNotes && (
+                              <div className="symptom-notes">
+                                <p>{isExpanded ? symptom.notes : truncatedNotes}</p>
+                                {shouldShowExpand && (
+                                  <button
+                                    className="expand-notes-btn"
+                                    onClick={() => toggleSymptomNoteExpansion(symptom.id)}
+                                  >
+                                    {isExpanded ? 'Show less' : 'Show more'}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="symptom-actions">
+                          <button
+                            className="icon-btn edit-btn"
+                            onClick={() => handleEditSymptom(symptom)}
+                            title="Edit"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            className="icon-btn delete-btn"
+                            onClick={() => handleDeleteSymptom(symptom.id)}
+                            title="Delete"
+                          >
+                            🗑️
+                          </button>
                         </div>
                       </div>
-                      <span className={`severity-badge ${getSeverityLabel(symptom.severity)}`}>
-                        {getSeverityLabel(symptom.severity)}
-                      </span>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <p style={{ textAlign: 'center', padding: '1rem', color: '#666' }}>
                     No symptoms logged yet
@@ -680,26 +861,88 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="medication-list">
                 {medications.length > 0 ? (
-                  medications.map((medication) => (
-                    <div key={medication.id} className="medication-item">
-                      <div className="medication-info">
-                        <div className="medication-icon">💊</div>
-                        <div className="medication-details">
-                          <h4>{medication.name}</h4>
-                          <span className="medication-time">
-                            {medication.time || ''} {medication.frequency}
-                          </span>
+                  medications.map((medication) => {
+                    const doseCount = getDoseCount(medication.frequency);
+
+                    return (
+                      <div key={medication.id} className="medication-item">
+                        <div className="medication-info">
+                          <div className="medication-icon">💊</div>
+                          <div className="medication-details">
+                            <h4>{medication.name}</h4>
+                            <span className="medication-time">
+                              {medication.time || ''} {medication.frequency}
+                            </span>
+                            {medication.notes && medication.notes.length > 0 && (
+                              <div className="medication-notes">
+                                <p>
+                                  {expandedMedicationNotes.has(medication.id)
+                                    ? medication.notes
+                                    : medication.notes.length > 100
+                                      ? medication.notes.substring(0, 100) + '...'
+                                      : medication.notes
+                                  }
+                                </p>
+                                {medication.notes.length > 100 && (
+                                  <button
+                                    className="expand-notes-btn"
+                                    onClick={() => toggleMedicationNoteExpansion(medication.id)}
+                                  >
+                                    {expandedMedicationNotes.has(medication.id) ? 'Show less' : 'Show more'}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="medication-actions">
+                          <div className="checkbox-group">
+                            {Array.from({ length: doseCount }, (_, i) => {
+                              const doseNumber = i + 1;
+                              const key = `${medication.id}-${doseNumber}`;
+                              const isTaken = medicationsTakenToday.has(key);
+                              const logId = medicationsTakenToday.get(key);
+                              const label = getDoseLabel(doseNumber, doseCount);
+
+                              return (
+                                <div key={doseNumber} className="dose-checkbox">
+                                  {label && <span className="dose-label">{label}</span>}
+                                  <button
+                                    className={`check-btn ${isTaken ? 'checked' : ''}`}
+                                    onClick={() => {
+                                      if (isTaken && logId) {
+                                        handleMedicationUncheck(logId, medication.id, doseNumber);
+                                      } else {
+                                        handleMedicationCheck(medication.id, doseNumber);
+                                      }
+                                    }}
+                                  >
+                                    {isTaken ? '✓' : ''}
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <button
+                            className="icon-btn edit-btn"
+                            onClick={() => handleEditMedication(medication)}
+                            title="Edit"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            className="icon-btn delete-btn"
+                            onClick={() => handleDeleteMedication(medication.id)}
+                            title="Delete"
+                          >
+                            🗑️
+                          </button>
                         </div>
                       </div>
-                      <button
-                        className={`check-btn ${medicationsTakenToday.has(medication.id) ? 'checked' : ''}`}
-                        onClick={() => handleMedicationCheck(medication.id)}
-                        disabled={medicationsTakenToday.has(medication.id)}
-                      >
-                        {medicationsTakenToday.has(medication.id) ? '✓' : '○'}
-                      </button>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <p style={{ textAlign: 'center', padding: '1rem', color: '#666' }}>
                     No medications added yet
@@ -802,8 +1045,11 @@ const Dashboard: React.FC = () => {
         >
           <div className="modal-content">
             <div className="modal-header">
-              <h3 className="modal-title">Log Symptom</h3>
-              <button className="close-btn" onClick={() => setSymptomModalOpen(false)}>
+              <h3 className="modal-title">{editingSymptom ? 'Edit' : 'Log'} Symptom</h3>
+              <button className="close-btn" onClick={() => {
+                setSymptomModalOpen(false);
+                setEditingSymptom(null);
+              }}>
                 ×
               </button>
             </div>
@@ -877,7 +1123,7 @@ const Dashboard: React.FC = () => {
                 ></textarea>
               </div>
               <button type="submit" className="submit-btn">
-                Log Symptom
+                {editingSymptom ? 'Update' : 'Log'} Symptom
               </button>
             </form>
           </div>
@@ -894,8 +1140,11 @@ const Dashboard: React.FC = () => {
         >
           <div className="modal-content">
             <div className="modal-header">
-              <h3 className="modal-title">Add Medication</h3>
-              <button className="close-btn" onClick={() => setMedicationModalOpen(false)}>
+              <h3 className="modal-title">{editingMedication ? 'Edit' : 'Add'} Medication</h3>
+              <button className="close-btn" onClick={() => {
+                setMedicationModalOpen(false);
+                setEditingMedication(null);
+              }}>
                 ×
               </button>
             </div>
@@ -977,7 +1226,7 @@ const Dashboard: React.FC = () => {
                 ></textarea>
               </div>
               <button type="submit" className="submit-btn">
-                Add Medication
+                {editingMedication ? 'Update' : 'Add'} Medication
               </button>
             </form>
           </div>

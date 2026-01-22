@@ -25,6 +25,7 @@ from app.schemas.dashboard import (
     MedicationUpdate,
     SymptomCreate,
     SymptomResponse,
+    SymptomUpdate,
     VitalSignCreate,
     VitalSignResponse,
 )
@@ -159,6 +160,7 @@ async def delete_medication(
 @router.post("/medications/{medication_id}/log", response_model=MedicationLogResponse, status_code=status.HTTP_201_CREATED)
 async def log_medication_taken(
     medication_id: int,
+    dose_number: int = 1,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -172,7 +174,7 @@ async def log_medication_taken(
     if not medication:
         raise HTTPException(status_code=404, detail="Medication not found")
 
-    # Check if already logged today
+    # Check if this specific dose already logged today
     today = date.today()
     today_start = datetime.combine(today, datetime.min.time())
     today_end = datetime.combine(today, datetime.max.time())
@@ -180,35 +182,50 @@ async def log_medication_taken(
     existing_log = db.query(MedicationLog).filter(
         MedicationLog.medication_id == medication_id,
         MedicationLog.user_id == current_user.id,
+        MedicationLog.dose_number == dose_number,
         MedicationLog.taken_at >= today_start,
         MedicationLog.taken_at <= today_end
     ).first()
 
     if existing_log:
-        raise HTTPException(status_code=400, detail="Medication already logged for today")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Dose {dose_number} already logged for today"
+        )
 
-    log = MedicationLog(medication_id=medication_id, user_id=current_user.id)
+    log = MedicationLog(
+        medication_id=medication_id,
+        user_id=current_user.id,
+        dose_number=dose_number
+    )
     db.add(log)
     db.commit()
     db.refresh(log)
     return log
 
 
-@router.get("/medications/logs/today", response_model=List[int])
+@router.get("/medications/logs/today")
 async def get_todays_medication_logs(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get list of medication IDs that were logged today"""
+    """Get medication logs from today with dose numbers and log IDs"""
     today = date.today()
     today_start = datetime.combine(today, datetime.min.time())
 
-    logs = db.query(MedicationLog.medication_id).filter(
+    logs = db.query(MedicationLog).filter(
         MedicationLog.user_id == current_user.id,
         MedicationLog.taken_at >= today_start
-    ).distinct().all()
+    ).all()
 
-    return [log[0] for log in logs]
+    return [
+        {
+            "medication_id": log.medication_id,
+            "dose_number": log.dose_number,
+            "log_id": log.id
+        }
+        for log in logs
+    ]
 
 
 @router.get("/medications/{medication_id}/logs", response_model=List[MedicationLogResponse])
@@ -226,6 +243,25 @@ async def get_medication_logs(
         MedicationLog.taken_at >= since_date
     ).order_by(MedicationLog.taken_at.desc()).all()
     return logs
+
+
+@router.delete("/medications/logs/{log_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_medication_log(
+    log_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a medication log"""
+    log = db.query(MedicationLog).filter(
+        MedicationLog.id == log_id,
+        MedicationLog.user_id == current_user.id
+    ).first()
+
+    if not log:
+        raise HTTPException(status_code=404, detail="Medication log not found")
+
+    db.delete(log)
+    db.commit()
 
 
 # ============ Symptom Routes ============
@@ -253,6 +289,30 @@ async def create_symptom(
     """Log a new symptom"""
     symptom = Symptom(**symptom_data.model_dump(), user_id=current_user.id)
     db.add(symptom)
+    db.commit()
+    db.refresh(symptom)
+    return symptom
+
+
+@router.put("/symptoms/{symptom_id}", response_model=SymptomResponse)
+async def update_symptom(
+    symptom_id: int,
+    symptom_data: SymptomUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update a symptom"""
+    symptom = db.query(Symptom).filter(
+        Symptom.id == symptom_id,
+        Symptom.user_id == current_user.id
+    ).first()
+
+    if not symptom:
+        raise HTTPException(status_code=404, detail="Symptom not found")
+
+    for key, value in symptom_data.model_dump(exclude_unset=True).items():
+        setattr(symptom, key, value)
+
     db.commit()
     db.refresh(symptom)
     return symptom
@@ -359,11 +419,20 @@ async def get_dashboard_summary(
         MedicationLog.taken_at >= today_start
     ).count()
 
-    # Total active medications
-    total_medications = db.query(Medication).filter(
+    # Total expected doses for today (calculate based on frequency)
+    active_medications = db.query(Medication).filter(
         Medication.user_id == current_user.id,
         Medication.is_active == True
-    ).count()
+    ).all()
+
+    total_medications = 0
+    for med in active_medications:
+        if med.frequency == 'twice':
+            total_medications += 2
+        elif med.frequency in ['daily', 'weekly', 'asneeded']:
+            total_medications += 1
+        else:
+            total_medications += 1  # Default to 1 for unknown frequencies
 
     # Latest BP (from vital signs with BP data)
     latest_bp_vital = db.query(VitalSign).filter(

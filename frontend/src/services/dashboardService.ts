@@ -43,6 +43,13 @@ export interface MedicationLog {
   medication_id: number;
   user_id: number;
   taken_at: string;
+  dose_number: number;
+}
+
+export interface TodayMedicationLog {
+  medication_id: number;
+  dose_number: number;
+  log_id: number;
 }
 
 export interface Symptom {
@@ -124,8 +131,15 @@ export const deleteMedication = async (medicationId: number): Promise<void> => {
   await axios.delete(`${API_URL}/medications/${medicationId}`, getAuthHeaders());
 };
 
-export const logMedicationTaken = async (medicationId: number): Promise<MedicationLog> => {
-  const response = await axios.post(`${API_URL}/medications/${medicationId}/log`, {}, getAuthHeaders());
+export const logMedicationTaken = async (
+  medicationId: number,
+  doseNumber: number = 1
+): Promise<MedicationLog> => {
+  const response = await axios.post(
+    `${API_URL}/medications/${medicationId}/log?dose_number=${doseNumber}`,
+    {},
+    getAuthHeaders()
+  );
   return response.data;
 };
 
@@ -137,7 +151,7 @@ export const getMedicationLogs = async (medicationId: number, days: number = 7):
   return response.data;
 };
 
-export const getTodaysMedicationLogs = async (): Promise<number[]> => {
+export const getTodaysMedicationLogs = async (): Promise<TodayMedicationLog[]> => {
   const response = await axios.get(`${API_URL}/medications/logs/today`, getAuthHeaders());
   return response.data;
 };
@@ -157,8 +171,20 @@ export const createSymptom = async (data: {
   return response.data;
 };
 
+export const updateSymptom = async (
+  symptomId: number,
+  data: Partial<Symptom>
+): Promise<Symptom> => {
+  const response = await axios.put(`${API_URL}/symptoms/${symptomId}`, data, getAuthHeaders());
+  return response.data;
+};
+
 export const deleteSymptom = async (symptomId: number): Promise<void> => {
   await axios.delete(`${API_URL}/symptoms/${symptomId}`, getAuthHeaders());
+};
+
+export const deleteMedicationLog = async (logId: number): Promise<void> => {
+  await axios.delete(`${API_URL}/medications/logs/${logId}`, getAuthHeaders());
 };
 
 // ============ Vital Signs API ============

@@ -33,6 +33,7 @@ class MedicationLog(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
 
     taken_at = Column(DateTime(timezone=True), server_default=func.now())
+    dose_number = Column(Integer, default=1, nullable=False)  # Track which dose (1st, 2nd, etc.)
 
     # Relationships
     medication = relationship("Medication", back_populates="medication_logs")

@@ -594,6 +594,128 @@
   color: var(--primary-blue);
 }
 
+/* Medication and Symptom Actions */
+.medication-actions,
+.symptom-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  font-size: 1.2rem;
+  opacity: 0.6;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.icon-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.edit-btn:hover {
+  color: var(--primary-blue);
+}
+
+.delete-btn:hover {
+  color: var(--danger);
+}
+
+/* Multiple Checkboxes for Medications */
+.checkbox-group {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.dose-checkbox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.dose-label {
+  font-size: 0.7rem;
+  color: var(--text-gray);
+  font-weight: 500;
+}
+
+.check-btn {
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid var(--primary-blue);
+  border-radius: 50%;
+  background-color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  transition: all 0.2s;
+}
+
+.check-btn:hover {
+  background-color: rgba(46, 94, 170, 0.1);
+  transform: scale(1.05);
+}
+
+.check-btn.checked {
+  background-color: var(--primary-blue);
+  color: white;
+}
+
+/* Symptom Notes Display */
+.symptom-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  flex: 1;
+}
+
+.symptom-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.symptom-notes,
+.medication-notes {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background-color: rgba(46, 94, 170, 0.05);
+  border-left: 3px solid var(--primary-blue);
+  border-radius: 0.25rem;
+  font-size: 0.9rem;
+  color: var(--text-gray);
+}
+
+.symptom-notes p,
+.medication-notes p {
+  margin: 0 0 0.5rem 0;
+  line-height: 1.4;
+}
+
+.expand-notes-btn {
+  background: none;
+  border: none;
+  color: var(--primary-blue);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.expand-notes-btn:hover {
+  color: var(--deep-blue);
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
   .main-grid {

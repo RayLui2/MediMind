@@ -64,6 +64,7 @@ class MedicationLogResponse(BaseModel):
     medication_id: int
     user_id: int
     taken_at: datetime
+    dose_number: int
 
     class Config:
         from_attributes = True
@@ -77,6 +78,11 @@ class SymptomBase(BaseModel):
 
 class SymptomCreate(SymptomBase):
     pass
+
+class SymptomUpdate(BaseModel):
+    symptom_type: Optional[str] = None
+    severity: Optional[int] = Field(None, ge=1, le=10)
+    notes: Optional[str] = None
 
 class SymptomResponse(SymptomBase):
     id: int
