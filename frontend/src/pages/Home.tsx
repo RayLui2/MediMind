@@ -1,8 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import '../styles/Home.css';
+import demoVideo from '../assets/MediMindDemo.mp4';
 
 const Home: React.FC = () => {
   const [currentTip, setCurrentTip] = React.useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const videoRef = React.useRef<HTMLVideoElement>(null);
 
   const healthTipsLeft = [
     "💡 24/7 Available",
@@ -24,6 +27,26 @@ const Home: React.FC = () => {
 
     return () => clearInterval(tipInterval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // Video event listeners
+    const video = videoRef.current;
+    if (video) {
+      const handlePlay = () => setIsPlaying(true);
+      const handlePause = () => setIsPlaying(false);
+      const handleEnded = () => setIsPlaying(false);
+
+      video.addEventListener('play', handlePlay);
+      video.addEventListener('pause', handlePause);
+      video.addEventListener('ended', handleEnded);
+
+      return () => {
+        video.removeEventListener('play', handlePlay);
+        video.removeEventListener('pause', handlePause);
+        video.removeEventListener('ended', handleEnded);
+      };
+    }
   }, []);
 
   useEffect(() => {
@@ -82,7 +105,6 @@ const Home: React.FC = () => {
         const angle = Math.atan2(e.clientY - robotCenterY, e.clientX - robotCenterX);
         const distance = Math.min(4, Math.hypot(e.clientX - robotCenterX, e.clientY - robotCenterY) / 100);
 
-        const pupil = eyeElement.querySelector('::after') as HTMLElement | null;
         eyeElement.style.setProperty('--eye-x', `${Math.cos(angle) * distance}px`);
         eyeElement.style.setProperty('--eye-y', `${Math.sin(angle) * distance}px`);
       });
@@ -173,7 +195,30 @@ const Home: React.FC = () => {
       <section className="demo-section fade-in-section">
         <h2 className="section-title">Watch our <span>Agent</span> in action</h2>
         <div className="video-container">
-          <div className="play-button"></div>
+          <video
+            ref={videoRef}
+            className="demo-video"
+            controls
+            poster=""
+          >
+            <source src={demoVideo} type="video/mp4" />
+            <source src={demoVideo} type="video/quicktime" />
+            Your browser does not support the video tag.
+          </video>
+          {!isPlaying && (
+            <div
+              className="play-button-overlay"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (videoRef.current) {
+                  videoRef.current.play();
+                  setIsPlaying(true);
+                }
+              }}
+            >
+              <div className="play-button"></div>
+            </div>
+          )}
         </div>
       </section>
 
