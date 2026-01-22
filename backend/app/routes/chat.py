@@ -97,25 +97,35 @@ async def stream_chat_message(
     db.commit()
     db.refresh(user_message)
 
-    # Generate title using LangGraph summarizer for new conversations
+    # Generate title using summarizer for new conversations
     if not conversation_id and conversation.title == "New Chat":  # Only for new conversations
         try:
-            config = {"configurable": {"thread_id": f"conversation_{conversation.id}"}}
+            # Call summarizer node directly instead of the full graph
+            from assistant.nodes.summarizer import create_summarizer_node
+            summarizer_node = create_summarizer_node()
 
-            # Run just the summarizer node to get the title
-            result = assistant_graph.invoke({
-                "messages": [SystemMessage(content=system_prompt), HumanMessage(content=message.content)],
-            }, config=config)
+            # Import State for the summarizer
+            from assistant.state import State
+
+            # Create a minimal state with just the message
+            state = State(
+                messages=[SystemMessage(content=system_prompt), HumanMessage(content=message.content)],
+                conversation_title="New Chat"
+            )
+
+            # Run summarizer directly
+            result = summarizer_node(state)
 
             # Extract conversation_title from result
             if result.get("conversation_title") and result["conversation_title"] != "New Chat":
+                print(f"Title generated: {result['conversation_title']}", flush=True)
                 conversation.title = result["conversation_title"]
-            db.commit()
-            db.refresh(conversation)
-            print(f"Updated title from message: {conversation.title}", flush=True)
+                print(f"Updating conversation title: {conversation.title}", flush=True)
+                db.commit()
+                db.refresh(conversation)
 
         except Exception as e:
-            print(f"Error generating title with LangGraph: {str(e)}", flush=True)
+            print(f"Error generating title: {str(e)}", flush=True)
             traceback.print_exc()
 
     # Create async generator for SSE format
@@ -228,10 +238,6 @@ User message:
             content=full_response
         )
         db.add(assistant_message)
-
-        if conversation.title == "New Chat":
-            conversation.title = message.content[:50]
-
         db.commit()
         db.refresh(assistant_message)
 

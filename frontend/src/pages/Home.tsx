@@ -2,6 +2,30 @@ import React, { useEffect } from 'react';
 import '../styles/Home.css';
 
 const Home: React.FC = () => {
+  const [currentTip, setCurrentTip] = React.useState(0);
+
+  const healthTipsLeft = [
+    "💡 24/7 Available",
+    "🩺 Track Symptoms",
+    "🔒 100% Secure"
+  ];
+
+  const healthTipsRight = [
+    "🌟 AI Powered",
+    "💊 Medication Reminders",
+    "🎯 Health Insights"
+  ];
+
+  useEffect(() => {
+    // Rotate health tips every 4 seconds
+    const tipInterval = setInterval(() => {
+      setCurrentTip((prev) => (prev + 1) % healthTipsLeft.length);
+    }, 4000);
+
+    return () => clearInterval(tipInterval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     // Scroll animation
     const observerOptions = {
@@ -42,6 +66,30 @@ const Home: React.FC = () => {
       anchor.addEventListener('click', handleSmoothScroll);
     });
 
+    // Interactive robot eyes that follow cursor
+    const handleMouseMove = (e: MouseEvent) => {
+      const eyes = document.querySelectorAll('.robot-eye');
+      const robot = document.querySelector('.robot');
+
+      if (!robot) return;
+
+      const robotRect = robot.getBoundingClientRect();
+      const robotCenterX = robotRect.left + robotRect.width / 2;
+      const robotCenterY = robotRect.top + robotRect.height / 2;
+
+      eyes.forEach((eye) => {
+        const eyeElement = eye as HTMLElement;
+        const angle = Math.atan2(e.clientY - robotCenterY, e.clientX - robotCenterX);
+        const distance = Math.min(4, Math.hypot(e.clientX - robotCenterX, e.clientY - robotCenterY) / 100);
+
+        const pupil = eyeElement.querySelector('::after') as HTMLElement | null;
+        eyeElement.style.setProperty('--eye-x', `${Math.cos(angle) * distance}px`);
+        eyeElement.style.setProperty('--eye-y', `${Math.sin(angle) * distance}px`);
+      });
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+
     // Cleanup
     return () => {
       document.querySelectorAll('.fade-in-section').forEach(section => {
@@ -50,6 +98,7 @@ const Home: React.FC = () => {
       anchors.forEach(anchor => {
         anchor.removeEventListener('click', handleSmoothScroll);
       });
+      document.removeEventListener('mousemove', handleMouseMove);
     };
   }, []);
 
@@ -57,6 +106,32 @@ const Home: React.FC = () => {
     <div className="home-page">
       {/* Hero Section */}
       <section className="hero" id="home">
+        {/* Animated particles */}
+        <div className="particles">
+          {[...Array(20)].map((_, i) => (
+            <div
+              key={i}
+              className="particle"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 8}s`,
+                animationDuration: `${8 + Math.random() * 8}s`
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Floating medical icons */}
+        <div className="floating-icons">
+          <div className="floating-icon" style={{ top: '15%', left: '10%', animationDelay: '0s' }}>💊</div>
+          <div className="floating-icon" style={{ top: '25%', right: '15%', animationDelay: '2s' }}>❤️</div>
+          <div className="floating-icon" style={{ bottom: '30%', left: '8%', animationDelay: '1s' }}>🩺</div>
+          <div className="floating-icon" style={{ bottom: '20%', right: '12%', animationDelay: '3s' }}>💉</div>
+          <div className="floating-icon" style={{ top: '45%', left: '5%', animationDelay: '1.5s' }}>🏥</div>
+          <div className="floating-icon" style={{ top: '60%', right: '8%', animationDelay: '2.5s' }}>⚕️</div>
+        </div>
+
         <div className="hero-content">
           <div className="hero-title">Help us Help you</div>
           <h1 className="hero-main">Meet MediMind</h1>
@@ -75,6 +150,18 @@ const Home: React.FC = () => {
               </div>
               <div className="robot-arm robot-arm-left"></div>
               <div className="robot-arm robot-arm-right"></div>
+            </div>
+
+            {/* Speech bubbles with rotating tips */}
+            <div className="speech-bubble speech-bubble-left">
+              <div className="speech-bubble-content">
+                {healthTipsLeft[currentTip]}
+              </div>
+            </div>
+            <div className="speech-bubble speech-bubble-right">
+              <div className="speech-bubble-content">
+                {healthTipsRight[currentTip]}
+              </div>
             </div>
           </div>
 
