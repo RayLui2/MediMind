@@ -1,0 +1,338 @@
+/* Modal Overlay - Makes modal visible */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 20px;
+  padding: 2rem;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.water-intake-modal {
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.modal-header h2 {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a2332;
+  margin: 0;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: #6b7280;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.modal-close:hover {
+  color: #1a2332;
+}
+
+.water-recommendation {
+  background: linear-gradient(135deg, #2e5eaa 0%, #1b3a6b 100%);
+  color: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.water-recommendation h3 {
+  font-size: 0.875rem;
+  font-weight: 500;
+  opacity: 0.9;
+  margin-bottom: 0.5rem;
+}
+
+.goal-amount {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.goal-amount .amount {
+  font-size: 2.5rem;
+  font-weight: 700;
+}
+
+.goal-amount .unit {
+  font-size: 1.25rem;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.goal-amount .cups {
+  font-size: 0.875rem;
+  opacity: 0.8;
+}
+
+.calculation-breakdown {
+  font-size: 0.8125rem;
+  opacity: 0.9;
+}
+
+.calculation-breakdown p {
+  margin: 0.25rem 0;
+}
+
+.water-progress {
+  margin-bottom: 1.5rem;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.progress-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a2332;
+  margin: 0;
+}
+
+.progress-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #2e5eaa;
+}
+
+.progress-bar {
+  height: 12px;
+  background-color: #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #5dd3c6 0%, #2e5eaa 100%);
+  transition: width 0.3s ease;
+}
+
+.progress-percentage {
+  font-size: 0.75rem;
+  color: #6b7280;
+  text-align: right;
+  margin: 0;
+}
+
+.quick-add-section {
+  margin-bottom: 1.5rem;
+}
+
+.quick-add-section h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a2332;
+  margin-bottom: 0.75rem;
+}
+
+.quick-add-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.quick-add-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem 0.75rem;
+  background-color: #f8fafb;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #2e5eaa;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quick-add-btn:hover {
+  background-color: #e8eef5;
+  border-color: #2e5eaa;
+  transform: translateY(-2px);
+}
+
+.quick-add-btn .btn-subtitle {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+.custom-amount-form {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.custom-amount-form input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.custom-amount-form input:focus {
+  outline: none;
+  border-color: #2e5eaa;
+  box-shadow: 0 0 0 3px rgba(46, 94, 170, 0.1);
+}
+
+.custom-amount-form button {
+  padding: 0.75rem 1.5rem;
+  background-color: #2e5eaa;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.custom-amount-form button:hover:not(:disabled) {
+  background-color: #1b3a6b;
+}
+
+.custom-amount-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.water-logs-section h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a2332;
+  margin-bottom: 0.75rem;
+}
+
+.no-logs {
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.875rem;
+  padding: 2rem;
+}
+
+.water-logs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.water-log-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background-color: #f8fafb;
+  border-radius: 8px;
+}
+
+.log-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.log-amount {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a2332;
+}
+
+.log-time {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.log-delete-btn {
+  padding: 0.375rem 0.75rem;
+  background-color: transparent;
+  color: #ef4444;
+  border: 1px solid #ef4444;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.log-delete-btn:hover {
+  background-color: #ef4444;
+  color: white;
+}
+
+.error-banner {
+  background-color: #fee;
+  color: #ef4444;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #ef4444;
+  font-size: 0.875rem;
+  margin-top: 1rem;
+}
+
+.modal-loading {
+  text-align: center;
+  padding: 3rem;
+  color: #6b7280;
+}
+
+/* Mobile Responsive */
+@media (max-width: 640px) {
+  .water-intake-modal {
+    max-width: 100%;
+  }
+
+  .quick-add-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .goal-amount .amount {
+    font-size: 2rem;
+  }
+}

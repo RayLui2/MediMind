@@ -20,6 +20,7 @@ interface User {
   name: string | null
   age: number | null
   created_at: string
+  setup_completed_at: string | null
 }
 
 interface TokenResponse {
@@ -84,4 +85,5 @@ class AuthService {
   }
 }
 
-export default new AuthService()
+const authServiceInstance = new AuthService()
+export default authServiceInstance

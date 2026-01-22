@@ -19,6 +19,7 @@ export interface HealthProfile {
   current_weight?: number;
   height?: number;
   blood_type?: string;
+  activity_level?: string;
   current_conditions: string[];
   allergies: string[];
   family_history: string[];
@@ -212,5 +213,70 @@ export const deleteVitalSign = async (vitalId: number): Promise<void> => {
 // ============ Dashboard Summary API ============
 export const getDashboardSummary = async (): Promise<DashboardSummary> => {
   const response = await axios.get(`${API_URL}/summary`, getAuthHeaders());
+  return response.data;
+};
+
+// ============ Setup Flow API ============
+export const completeSetup = async (data: {
+  current_weight?: number;
+  height?: number;
+  activity_level?: string;
+  current_conditions: string[];
+  allergies: string[];
+  family_history: string[];
+}): Promise<{ success: boolean; message: string }> => {
+  const response = await axios.post(`${API_URL}/setup/complete`, data, getAuthHeaders());
+  return response.data;
+};
+
+export const getSetupStatus = async (): Promise<{
+  setup_complete: boolean;
+  setup_completed_at?: string;
+}> => {
+  const response = await axios.get(`${API_URL}/setup/status`, getAuthHeaders());
+  return response.data;
+};
+
+// ============ Water Intake API ============
+export interface WaterIntake {
+  id: number;
+  user_id: number;
+  amount_oz: number;
+  consumed_at: string;
+}
+
+export interface WaterIntakeRecommendation {
+  recommended_oz: number;
+  base_amount: number;
+  activity_adjustment: number;
+  cups: number;
+}
+
+export const logWaterIntake = async (amount_oz: number): Promise<WaterIntake> => {
+  const response = await axios.post(
+    `${API_URL}/water-intake`,
+    { amount_oz },
+    getAuthHeaders()
+  );
+  return response.data;
+};
+
+export const getWaterIntakes = async (days: number = 1): Promise<WaterIntake[]> => {
+  const response = await axios.get(
+    `${API_URL}/water-intake?days=${days}`,
+    getAuthHeaders()
+  );
+  return response.data;
+};
+
+export const deleteWaterIntake = async (intakeId: number): Promise<void> => {
+  await axios.delete(`${API_URL}/water-intake/${intakeId}`, getAuthHeaders());
+};
+
+export const getWaterIntakeRecommendation = async (): Promise<WaterIntakeRecommendation> => {
+  const response = await axios.get(
+    `${API_URL}/water-intake/recommendation`,
+    getAuthHeaders()
+  );
   return response.data;
 };

@@ -16,6 +16,7 @@ class UserResponse(BaseModel):
      name: Optional[str] = None
      age: Optional[int] = None
      created_at: datetime
+     setup_completed_at: Optional[datetime] = None
 
      class Config:
         from_attributes = True  # Allows converting SQLAlchemy models to Pydantic
