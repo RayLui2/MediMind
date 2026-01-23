@@ -887,6 +887,7 @@
   font-size: 0.95rem;
   transition: all 0.3s ease;
   display: inline-block;
+  cursor: pointer;
 }
 
 .home-page .footer-links a:hover {

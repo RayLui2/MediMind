@@ -328,10 +328,10 @@ const Home: React.FC = () => {
             <div className="footer-section">
               <h4 className="footer-heading">Resources</h4>
               <ul className="footer-links">
-                <li><a href="#">Help Center</a></li>
-                <li><a href="#">Privacy Policy</a></li>
-                <li><a href="#">Terms of Service</a></li>
-                <li><a href="#">Medical Disclaimer</a></li>
+                <li><a>Help Center</a></li>
+                <li><a>Privacy Policy</a></li>
+                <li><a>Terms of Service</a></li>
+                <li><a>Medical Disclaimer</a></li>
               </ul>
             </div>
 
