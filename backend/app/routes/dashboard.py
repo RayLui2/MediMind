@@ -10,10 +10,12 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.health_profile import HealthProfile
 from app.models.medication import Medication, MedicationLog
+from app.models.recommendations import Recommendation
 from app.models.symptom import Symptom
 from app.models.user import User
 from app.models.vital_sign import VitalSign
 from app.models.water_intake import WaterIntake
+from app.services.recommendation_service import create_recommendations
 from app.routes.auth import get_current_user
 from app.schemas.dashboard import (
     DashboardSummary,
@@ -24,6 +26,8 @@ from app.schemas.dashboard import (
     MedicationLogResponse,
     MedicationResponse,
     MedicationUpdate,
+    RecommendationResponse,
+    RecommendationsListResponse,
     SetupCompleteRequest,
     SetupCompleteResponse,
     SetupStatusResponse,
@@ -660,3 +664,36 @@ async def get_water_intake_recommendation(
         activity_adjustment=activity_adjustment,
         cups=round(cups, 1)
     )
+
+@router.get("/recommendations", response_model=List[RecommendationResponse])
+async def get_recommendations(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    recommendations = db.query(Recommendation).filter(
+        Recommendation.user_id == current_user.id
+    ).all()
+
+    if not recommendations:
+        raise HTTPException(
+            status_code=404,
+            detail="No recommendations exist for this user"
+        )
+    
+    return recommendations
+
+@router.post("/recommendations/generate", response_model=List[RecommendationResponse])
+async def generate_recommendations(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Generate new personalized health recommendations using AI"""
+    # Call the recommendation service to generate new recommendations
+    create_recommendations(current_user.id, db)
+
+    # Fetch and return the newly created recommendations
+    recommendations = db.query(Recommendation).filter(
+        Recommendation.user_id == current_user.id
+    ).order_by(Recommendation.created_at.desc()).all()
+
+    return recommendations

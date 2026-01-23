@@ -9,9 +9,11 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 # Local
 from assistant.state import State
-from app.models.health_profile import HealthProfile
-from app.models.vital_sign import VitalSign
+from app.models.health_profile import HealthProfile as HealthProfileDB
+from app.models.vital_sign import VitalSign as VitalSignDB
 from app.models.recommendations import Recommendation, RecommendationsResponse
+from assistant.models.health_profile import HealthProfile
+from assistant.models.vital_sign import VitalSign
 
 load_dotenv()
 
@@ -60,8 +62,8 @@ Generate exactly 6 personalized health recommendations based on the above data. 
 - Monitoring and tracking
 
 Each recommendation should have:
-- **Title**: A clear, concise title (max 8 words)
-- **Description**: A detailed, actionable explanation (2-4 sentences) that explains what to do and why it matters for this specific user
+- **Title**: A clear, concise title (max 5 words). Add an emoji before the 5 words
+- **Description**: A detailed, actionable explanation (2 short, concise sentences MAX) that explains what to do and why it matters for this specific user
 
 Make the recommendations practical, evidence-based, and appropriate for someone with their specific health profile.
 
@@ -74,26 +76,26 @@ IMPORTANT:
     return prompt
 
 def create_recommendations(user_id: int, db):
-    # time.sleep(300) # Wait 5 minutes
+    # Get data from database
+    db_health_profile = db.query(HealthProfileDB).filter(
+        HealthProfileDB.user_id == user_id
+    ).first()
 
-    def get_data(state: State):
-        # Get data from database
-        db_health_profile = db.query(HealthProfile).filter(
-            HealthProfile.user_id == user_id
-        )
+    db_vital_signs = db.query(VitalSignDB).filter(
+        VitalSignDB.user_id == user_id
+    ).order_by(VitalSignDB.recorded_at.desc()).first()
 
-        db_vital_signs = db.query(VitalSign).filter(
-            VitalSign.user_id == user_id
-        )
-        if not state:
-            state = State()
+    # Convert SQLAlchemy models to Pydantic models
+    health_profile = HealthProfile.model_validate(db_health_profile) if db_health_profile else None
+    vital_signs = VitalSign.model_validate(db_vital_signs) if db_vital_signs else None
 
-        state.health_profile = db_health_profile
-        state.vital_signs = db_vital_signs
-
-        return state
-
-    data = get_data
+    # Create state with the data
+    data = State(
+        messages=[],
+        user_id=user_id,
+        health_profile=health_profile,
+        vital_signs=vital_signs
+    )
 
     # Initilize chat model
     llm = init_chat_model(
@@ -125,7 +127,7 @@ def create_recommendations(user_id: int, db):
         db_recommendation = Recommendation(
             user_id=user_id,
             title=rec.title,
-            description=rec.description,
+            recommendation=rec.recommendation,
         )
         db.add(db_recommendation)
 

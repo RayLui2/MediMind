@@ -23,3 +23,4 @@ class User(Base):
     symptoms = relationship("Symptom", back_populates="user", cascade="all, delete-orphan")
     vital_signs = relationship("VitalSign", back_populates="user", cascade="all, delete-orphan")
     water_intakes = relationship("WaterIntake", back_populates="user", cascade="all, delete-orphan")
+    recommendations = relationship("Recommendation", back_populates="user", cascade="all, delete-orphan")

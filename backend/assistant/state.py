@@ -17,7 +17,7 @@ class State(BaseModel):
 
     # Metadata - use simple types, not SQLAlchemy models
     conversation_id: Optional[int] = None
-    user_id: int
+    user_id: Optional[int] = None
 
     # User profile data
     user_data: Optional[dict] = None # Change it from Optional[dict] to Optional[User] using the User basemodel in assistant/models/user.py
@@ -35,7 +35,7 @@ class State(BaseModel):
     conversation_title: Optional[str] = "New Chat"
 
     # Optional: health profile about the user
-    health_profile = Optional[HealthProfile] = None
+    health_profile: Optional[HealthProfile] = None
 
     # Optional: vital signs of the user
-    vital_signs = Optional[VitalSign] = None
+    vital_signs: Optional[VitalSign] = None

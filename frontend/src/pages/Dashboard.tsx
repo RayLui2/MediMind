@@ -22,6 +22,9 @@ const Dashboard: React.FC = () => {
   const [vitalSigns, setVitalSigns] = useState<dashboardService.VitalSign[]>([]);
   const [healthProfile, setHealthProfile] = useState<dashboardService.HealthProfile | null>(null);
   const [medicationsTakenToday, setMedicationsTakenToday] = useState<Map<string, number>>(new Map());
+  const [recommendations, setRecommendations] = useState<dashboardService.Recommendation[]>([]);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [recommendationPage, setRecommendationPage] = useState(0);
 
   // Edit states
   const [editingMedication, setEditingMedication] = useState<dashboardService.Medication | null>(null);
@@ -135,6 +138,17 @@ const Dashboard: React.FC = () => {
           setHealthProfile(null);
         }
       }
+
+      // Try to fetch recommendations
+      try {
+        const recommendationsData = await dashboardService.getRecommendations();
+        setRecommendations(recommendationsData);
+      } catch (error: any) {
+        if (error.response?.status === 404) {
+          // No recommendations yet - that's okay
+          setRecommendations([]);
+        }
+      }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -145,6 +159,20 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  // Rotate recommendations every 20 seconds
+  useEffect(() => {
+    if (recommendations.length <= 3) return;
+
+    const interval = setInterval(() => {
+      setRecommendationPage((prev) => {
+        const totalPages = Math.ceil(recommendations.length / 3);
+        return (prev + 1) % totalPages;
+      });
+    }, 20000);
+
+    return () => clearInterval(interval);
+  }, [recommendations.length]);
 
   // Initialize Chart with real data
   useEffect(() => {
@@ -570,9 +598,26 @@ const Dashboard: React.FC = () => {
       setVitalSigns(prev => [newVitalSign, ...prev]);
       const newSummary = await dashboardService.getDashboardSummary();
       setSummary(newSummary);
+
+      // Generate new recommendations based on updated vital signs
+      handleGenerateRecommendations();
     } catch (error) {
       console.error('Error adding vital sign:', error);
       alert('Failed to add vital sign');
+    }
+  };
+
+  // Generate new recommendations
+  const handleGenerateRecommendations = async () => {
+    try {
+      setRecommendationsLoading(true);
+      const newRecommendations = await dashboardService.generateRecommendations();
+      setRecommendations(newRecommendations);
+      setRecommendationPage(0);
+    } catch (error) {
+      console.error('Error generating recommendations:', error);
+    } finally {
+      setRecommendationsLoading(false);
     }
   };
 
@@ -601,6 +646,9 @@ const Dashboard: React.FC = () => {
       setHealthProfile(updatedProfile);
       const newSummary = await dashboardService.getDashboardSummary();
       setSummary(newSummary);
+
+      // Generate new recommendations based on updated health profile
+      handleGenerateRecommendations();
     } catch (error) {
       console.error('Error updating health profile:', error);
       alert('Failed to update health profile');
@@ -911,14 +959,20 @@ const Dashboard: React.FC = () => {
                             onClick={() => handleEditSymptom(symptom)}
                             title="Edit"
                           >
-                            ✏️
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
                           </button>
                           <button
                             className="icon-btn delete-btn"
                             onClick={() => handleDeleteSymptom(symptom.id)}
                             title="Delete"
                           >
-                            🗑️
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="3 6 5 6 21 6" />
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                            </svg>
                           </button>
                         </div>
                       </div>
@@ -1039,14 +1093,20 @@ const Dashboard: React.FC = () => {
                             onClick={() => handleEditMedication(medication)}
                             title="Edit"
                           >
-                            ✏️
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
                           </button>
                           <button
                             className="icon-btn delete-btn"
                             onClick={() => handleDeleteMedication(medication.id)}
                             title="Delete"
                           >
-                            🗑️
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="3 6 5 6 21 6" />
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                            </svg>
                           </button>
                         </div>
                       </div>
@@ -1124,20 +1184,68 @@ const Dashboard: React.FC = () => {
             <div className="card">
               <div className="card-header">
                 <h3 className="card-title">AI Recommendations</h3>
+                <span
+                  className="card-action"
+                  onClick={handleGenerateRecommendations}
+                  style={{ opacity: recommendationsLoading ? 0.5 : 1 }}
+                >
+                  {recommendationsLoading ? 'Generating...' : 'Refresh'}
+                </span>
               </div>
               <div className="recommendations-list">
-                <div className="recommendation-item">
-                  <h5>💪 Increase Physical Activity</h5>
-                  <p>Based on your weight goals, try adding 15 minutes of walking daily.</p>
-                </div>
-                <div className="recommendation-item">
-                  <h5>😴 Improve Sleep Schedule</h5>
-                  <p>Your symptom patterns suggest inconsistent sleep. Aim for 7-8 hours nightly.</p>
-                </div>
-                <div className="recommendation-item">
-                  <h5>💧 Hydration Reminder</h5>
-                  <p>Drink at least 8 glasses of water daily to help with headaches.</p>
-                </div>
+                {recommendations.length > 0 ? (
+                  <>
+                    {recommendations
+                      .slice(recommendationPage * 3, recommendationPage * 3 + 3)
+                      .map((rec) => (
+                        <div key={rec.id} className="recommendation-item">
+                          <h5>{rec.title}</h5>
+                          <p>{rec.recommendation}</p>
+                        </div>
+                      ))}
+                    {recommendations.length > 3 && (
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                        marginTop: '1rem'
+                      }}>
+                        {Array.from({ length: Math.ceil(recommendations.length / 3) }).map((_, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setRecommendationPage(idx)}
+                            style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '50%',
+                              border: 'none',
+                              backgroundColor: idx === recommendationPage ? '#2E5EAA' : '#ddd',
+                              cursor: 'pointer',
+                              padding: 0,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : recommendationsLoading ? (
+                  <p style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                    Generating personalized recommendations...
+                  </p>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '1.5rem', color: '#666' }}>
+                    <p style={{ marginBottom: '1rem' }}>
+                      No recommendations yet. Update your health profile or vital signs to get personalized recommendations.
+                    </p>
+                    <button
+                      className="submit-btn"
+                      onClick={handleGenerateRecommendations}
+                      style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+                    >
+                      Generate Recommendations
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

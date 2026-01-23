@@ -1,26 +1,25 @@
-from sqlalchemy import Column, Integer, Float, ForeignKey, DateTime, String
-from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
-from app.database import Base
+from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime
 
-class VitalSign(Base):
+
+class VitalSign(BaseModel):
     """User's vital signs tracking (BP, heart rate, weight, etc.)"""
-    __tablename__ = "vital_signs"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    id: Optional[int] = None
+    user_id: Optional[int] = None
 
     # Vital measurements
-    systolic_bp = Column(Integer)  # mmHg
-    diastolic_bp = Column(Integer)  # mmHg
-    heart_rate = Column(Integer)  # bpm
-    weight = Column(Integer)  # lbs
-    temperature = Column(Float)  # Fahrenheit
+    systolic_bp: Optional[int] = None  # mmHg
+    diastolic_bp: Optional[int] = None  # mmHg
+    heart_rate: Optional[int] = None  # bpm
+    weight: Optional[int] = None  # lbs
+    temperature: Optional[float] = None  # Fahrenheit
 
     # Optional metadata
-    notes = Column(String)
+    notes: Optional[str] = None
 
-    recorded_at = Column(DateTime(timezone=True), server_default=func.now())
+    recorded_at: Optional[datetime] = None
 
-    # Relationships
-    user = relationship("User", back_populates="vital_signs")
+    class Config:
+        from_attributes = True
