@@ -101,7 +101,7 @@ async def stream_chat_message(
     if not conversation_id and conversation.title == "New Chat":  # Only for new conversations
         try:
             # Call summarizer node directly instead of the full graph
-            from assistant.nodes.summarizer import create_summarizer_node
+            from ..services.chat_service import create_summarizer_node
             summarizer_node = create_summarizer_node()
 
             # Import State for the summarizer
