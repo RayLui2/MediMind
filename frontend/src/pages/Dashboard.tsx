@@ -81,6 +81,15 @@ const Dashboard: React.FC = () => {
   const [bmiHeightInches, setBmiHeightInches] = useState('');
   const [bmiResult, setBmiResult] = useState<number | null>(null);
 
+  // Form states for Health Risk calculator modal
+  const [healthRiskModalOpen, setHealthRiskModalOpen] = useState(false);
+  const [healthRiskResult, setHealthRiskResult] = useState<{
+    score: number;
+    category: string;
+    color: string;
+    breakdown: { factor: string; score: number; maxScore: number }[];
+  } | null>(null);
+
   // Loading state
   const [loading, setLoading] = useState(true);
 
@@ -658,11 +667,93 @@ const Dashboard: React.FC = () => {
     return { category: 'Obese', color: '#EF5350' };
   };
 
+  const calculateHealthRisk = () => {
+    const breakdown: { factor: string; score: number; maxScore: number }[] = [];
+    let totalScore = 0;
+
+    // 1. BMI Score (25 points max)
+    if (healthProfile?.current_weight && healthProfile?.height) {
+      const bmi = (healthProfile.current_weight * 703) / (healthProfile.height * healthProfile.height);
+      let bmiScore = 25;
+      if (bmi < 18.5) bmiScore = 15;
+      else if (bmi >= 25 && bmi < 30) bmiScore = 15;
+      else if (bmi >= 30) bmiScore = 5;
+      breakdown.push({ factor: 'BMI', score: bmiScore, maxScore: 25 });
+      totalScore += bmiScore;
+    } else {
+      breakdown.push({ factor: 'BMI', score: 0, maxScore: 25 });
+    }
+
+    // 2. Blood Pressure Score (20 points max)
+    const latestVital = vitalSigns[0];
+    if (latestVital?.systolic_bp && latestVital?.diastolic_bp) {
+      let bpScore = 20;
+      if (latestVital.systolic_bp >= 140 || latestVital.diastolic_bp >= 90) bpScore = 5;
+      else if (latestVital.systolic_bp >= 130 || latestVital.diastolic_bp >= 80) bpScore = 12;
+      else if (latestVital.systolic_bp >= 120) bpScore = 16;
+      breakdown.push({ factor: 'Blood Pressure', score: bpScore, maxScore: 20 });
+      totalScore += bpScore;
+    } else {
+      breakdown.push({ factor: 'Blood Pressure', score: 0, maxScore: 20 });
+    }
+
+    // 3. Activity Level Score (20 points max)
+    const activityScores: Record<string, number> = {
+      extremely_active: 20,
+      very_active: 18,
+      moderately_active: 14,
+      lightly_active: 10,
+      sedentary: 6
+    };
+    const activityScore = activityScores[healthProfile?.activity_level || 'sedentary'] || 6;
+    breakdown.push({ factor: 'Activity Level', score: activityScore, maxScore: 20 });
+    totalScore += activityScore;
+
+    // 4. Conditions Score (15 points max)
+    const conditionsCount = healthProfile?.current_conditions?.length || 0;
+    const conditionsScore = Math.max(0, 15 - (conditionsCount * 5));
+    breakdown.push({ factor: 'Health Conditions', score: conditionsScore, maxScore: 15 });
+    totalScore += conditionsScore;
+
+    // 5. Family History Score (10 points max)
+    const familyCount = healthProfile?.family_history?.length || 0;
+    const familyScore = Math.max(0, 10 - (familyCount * 3));
+    breakdown.push({ factor: 'Family History', score: familyScore, maxScore: 10 });
+    totalScore += familyScore;
+
+    // 6. Age Score (10 points max)
+    const age = user?.age || 30;
+    let ageScore = 10;
+    if (age >= 65) ageScore = 4;
+    else if (age >= 55) ageScore = 6;
+    else if (age >= 45) ageScore = 8;
+    breakdown.push({ factor: 'Age Factor', score: ageScore, maxScore: 10 });
+    totalScore += ageScore;
+
+    // Determine category
+    let category: string, color: string;
+    if (totalScore >= 80) {
+      category = 'Excellent';
+      color = '#4CAF50';
+    } else if (totalScore >= 60) {
+      category = 'Good';
+      color = '#2196F3';
+    } else if (totalScore >= 40) {
+      category = 'Fair';
+      color = '#FFA726';
+    } else {
+      category = 'Needs Attention';
+      color = '#EF5350';
+    }
+
+    setHealthRiskResult({ score: totalScore, category, color, breakdown });
+  };
+
   const openCalculator = (type: string) => {
     if (type === 'water') {
       setWaterIntakeModalOpen(true);
-    } else {
-      alert(`${type.toUpperCase()} Calculator would open here. This would be a separate modal with calculator inputs.`);
+    } else if (type === 'risk') {
+      setHealthRiskModalOpen(true);
     }
   };
 
@@ -1723,6 +1814,119 @@ const Dashboard: React.FC = () => {
       {/* Water Intake Modal */}
       {waterIntakeModalOpen && (
         <WaterIntakeModal onClose={() => setWaterIntakeModalOpen(false)} />
+      )}
+
+      {/* Health Risk Calculator Modal */}
+      {healthRiskModalOpen && (
+        <div
+          className="modal active"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setHealthRiskModalOpen(false);
+          }}
+        >
+          <div className="modal-content" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Health Risk Calculator</h3>
+              <button className="close-btn" onClick={() => setHealthRiskModalOpen(false)}>
+                x
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ color: '#666', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+                Calculate your overall health score based on your profile data, vital signs, and lifestyle factors.
+              </p>
+
+              {healthRiskResult && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                  {/* Score Display */}
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '1.5rem',
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: '12px',
+                    marginBottom: '1.5rem'
+                  }}>
+                    <div style={{
+                      fontSize: '3rem',
+                      fontWeight: '700',
+                      color: healthRiskResult.color
+                    }}>
+                      {healthRiskResult.score}
+                    </div>
+                    <div style={{
+                      fontSize: '0.9rem',
+                      color: '#666',
+                      marginBottom: '0.5rem'
+                    }}>
+                      out of 100
+                    </div>
+                    <div style={{
+                      display: 'inline-block',
+                      padding: '0.5rem 1rem',
+                      backgroundColor: healthRiskResult.color,
+                      color: 'white',
+                      borderRadius: '20px',
+                      fontWeight: '600',
+                      fontSize: '0.9rem'
+                    }}>
+                      {healthRiskResult.category}
+                    </div>
+                  </div>
+
+                  {/* Breakdown */}
+                  <div>
+                    <h4 style={{ marginBottom: '1rem', fontSize: '1rem', color: '#333' }}>Score Breakdown</h4>
+                    {healthRiskResult.breakdown.map((item, idx) => (
+                      <div key={idx} style={{ marginBottom: '0.75rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                          <span style={{ fontSize: '0.85rem', color: '#555' }}>{item.factor}</span>
+                          <span style={{ fontSize: '0.85rem', color: '#333', fontWeight: '500' }}>
+                            {item.score}/{item.maxScore}
+                          </span>
+                        </div>
+                        <div style={{
+                          height: '8px',
+                          backgroundColor: '#e9ecef',
+                          borderRadius: '4px',
+                          overflow: 'hidden'
+                        }}>
+                          <div style={{
+                            height: '100%',
+                            width: `${(item.score / item.maxScore) * 100}%`,
+                            backgroundColor: item.score === item.maxScore ? '#4CAF50' :
+                              item.score >= item.maxScore * 0.7 ? '#2196F3' :
+                              item.score >= item.maxScore * 0.4 ? '#FFA726' : '#EF5350',
+                            borderRadius: '4px',
+                            transition: 'width 0.3s ease'
+                          }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!healthRiskResult && (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '2rem',
+                  backgroundColor: '#f8f9fa',
+                  borderRadius: '12px',
+                  color: '#666'
+                }}>
+                  <p>Click the button below to calculate your health risk score based on your current health data.</p>
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              className="submit-btn"
+              onClick={calculateHealthRisk}
+            >
+              {healthRiskResult ? 'Recalculate' : 'Calculate'} Health Score
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
