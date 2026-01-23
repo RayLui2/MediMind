@@ -11,21 +11,21 @@ from pydantic import BaseModel, Field
 from assistant.state import State
 
 def update_instructions(user_message: str, instructions: List[str]) -> List[str]:
-        class InstructionsResponse(BaseModel):
-            instructions: List[str] = Field(
-                description="List of instruction strings extracted from the user message"
-            )
-
-        llm = init_chat_model(
-            os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-            model_provider="google_genai",
-            api_key=os.getenv("GEMINI_API_KEY"),
-            temperature=0.0,
+    class InstructionsResponse(BaseModel):
+        instructions: List[str] = Field(
+            description="List of instruction strings extracted from the user message"
         )
 
-        structured_llm = llm.with_structured_output(InstructionsResponse)
+    llm = init_chat_model(
+        os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        model_provider="google_genai",
+        api_key=os.getenv("GEMINI_API_KEY"),
+        temperature=0.0,
+    )
 
-        prompt = f"""
+    structured_llm = llm.with_structured_output(InstructionsResponse)
+
+    prompt = f"""
 Current instructions: {instructions}
 
 Analyze the user's message and extract any instructions about how they want responses formatted or delivered.
@@ -39,12 +39,12 @@ Examples of instructions:
 
 Return an empty list if no instructions are found.
 """
-        response = structured_llm.invoke([
-            SystemMessage(content=prompt),
-            HumanMessage(content=user_message),
-        ])
+    response = structured_llm.invoke([
+        SystemMessage(content=prompt),
+        HumanMessage(content=user_message),
+    ])
 
-        return response.instructions
+    return response.instructions
 
 def create_summarizer_node():
     """Create a node that generates a concise title from the first message"""
