@@ -118,14 +118,11 @@ async def stream_chat_message(
 
             # Extract conversation_title from result
             if result.get("conversation_title") and result["conversation_title"] != "New Chat":
-                print(f"Title generated: {result['conversation_title']}", flush=True)
                 conversation.title = result["conversation_title"]
-                print(f"Updating conversation title: {conversation.title}", flush=True)
                 db.commit()
                 db.refresh(conversation)
 
         except Exception as e:
-            print(f"Error generating title: {str(e)}", flush=True)
             traceback.print_exc()
 
     # Create async generator for SSE format
@@ -212,9 +209,6 @@ User message:
                     full_response += token
                     chunk_count += 1
 
-                    # Debug: Log chunk info
-                    print(f"Chunk {chunk_count}: '{token[:50]}...' (length: {len(token)})", flush=True)
-
                     # Yield each token immediately as SSE chunk
                     chunk_data = {"type": "chunk", "text": token}
                     yield f"data: {json.dumps(chunk_data)}\n\n"
@@ -222,10 +216,7 @@ User message:
                     # Force async yield to prevent buffering
                     await asyncio.sleep(0)
 
-            print(f"Total chunks streamed: {chunk_count}", flush=True)
-
         except Exception as e:
-            print(f"Error in streaming: {str(e)}")
             traceback.print_exc()
             error_data = {"type": "error", "message": str(e)}
             yield f"data: {json.dumps(error_data)}\n\n"
