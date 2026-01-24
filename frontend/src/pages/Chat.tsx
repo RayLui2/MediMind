@@ -125,6 +125,7 @@ const Chat: React.FC = () => {
       let accumulatedText = ''
       let conversationId = currentConversation?.id || null
       let assistantMessageId: number | null = null
+      let firstChunkReceived = false
 
       // Read stream
       while (true) {
@@ -144,6 +145,8 @@ const Chat: React.FC = () => {
                 console.log('📦 Metadata received:', data)
                 conversationId = data.conversation_id
 
+                // Update user message with real ID, but DON'T add assistant message yet
+                // Keep the typing indicator visible until first chunk arrives
                 setMessages((prev) => {
                   // Remove temp user message and replace with real one
                   const withoutTempUser = prev.filter(
@@ -159,32 +162,44 @@ const Chat: React.FC = () => {
                       content: messageContent,
                       created_at: new Date().toISOString(),
                     },
-                    {
-                      id: tempAssistantId,
-                      conversation_id: data.conversation_id,
-                      role: 'assistant',
-                      content: '',
-                      created_at: new Date().toISOString(),
-                    },
                   ]
                 })
-                setLoading(false)
+                // DON'T set loading to false here - keep typing indicator visible
               } else if (data.type === 'chunk') {
                 console.log('📨 Chunk received:', data.text)
                 accumulatedText += data.text
-                setMessages((prev) => {
-                  const updated = [...prev]
-                  const assistantMsgIndex = updated.findIndex(
-                    (msg) => msg.id === tempAssistantId
-                  )
-                  if (assistantMsgIndex !== -1) {
-                    updated[assistantMsgIndex] = {
-                      ...updated[assistantMsgIndex],
+
+                // On first chunk, add assistant message and hide typing indicator
+                if (!firstChunkReceived) {
+                  firstChunkReceived = true
+                  setLoading(false)
+
+                  setMessages((prev) => [
+                    ...prev,
+                    {
+                      id: tempAssistantId,
+                      conversation_id: conversationId || 0,
+                      role: 'assistant',
                       content: accumulatedText,
+                      created_at: new Date().toISOString(),
+                    },
+                  ])
+                } else {
+                  // Subsequent chunks - update existing assistant message
+                  setMessages((prev) => {
+                    const updated = [...prev]
+                    const assistantMsgIndex = updated.findIndex(
+                      (msg) => msg.id === tempAssistantId
+                    )
+                    if (assistantMsgIndex !== -1) {
+                      updated[assistantMsgIndex] = {
+                        ...updated[assistantMsgIndex],
+                        content: accumulatedText,
+                      }
                     }
-                  }
-                  return updated
-                })
+                    return updated
+                  })
+                }
               } else if (data.type === 'complete') {
                 console.log('✅ Stream complete, message ID:', data.assistant_message_id)
                 assistantMessageId = data.assistant_message_id

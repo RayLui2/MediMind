@@ -10,15 +10,15 @@ from assistant.state import State
 
 def create_summarizer_node():
     """Create a node that generates a concise title from the first message"""
-    
+
     llm = init_chat_model(
         os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
         model_provider="google_genai",
         api_key=os.getenv("GEMINI_API_KEY"),
         temperature=0.3,
     )
-    
-    def summarizer_node(state: State):
+
+    async def summarizer_node(state: State):
         # Only summarize if there's no summary yet
         if state.conversation_title != "New Chat":
             return {"conversation_title": state.conversation_title}
@@ -33,7 +33,7 @@ def create_summarizer_node():
 
         if not first_user_msg:
             return {"conversation_title": "New Chat"}
-        
+
         # Create summarization prompt
         prompt = f"""Generate a concise, descriptive title (max 6 words) with an emoji at the end of the title. The title should be a single sentence and should be descriptive of the conversation:
 
@@ -47,12 +47,12 @@ Title: "I have a headache 🤒"
 
 User's first message: "{first_user_msg}"
 """
-        
-        # Get summary from LLM
-        response = llm.invoke([HumanMessage(content=prompt)])
+
+        # Get summary from LLM (use ainvoke for async)
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
         conversation_title = response.content.strip()
-        
+
         print(f"Conversation title: {conversation_title}")
         return {"conversation_title": conversation_title}
-    
+
     return summarizer_node

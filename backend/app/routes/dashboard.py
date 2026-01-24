@@ -15,7 +15,7 @@ from app.models.symptom import Symptom
 from app.models.user import User
 from app.models.vital_sign import VitalSign
 from app.models.water_intake import WaterIntake
-from app.services.recommendation_service import create_recommendations
+from app.services.assistant_service import AssistantService
 from app.routes.auth import get_current_user
 from app.schemas.dashboard import (
     DashboardSummary,
@@ -687,13 +687,16 @@ async def generate_recommendations(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Generate new personalized health recommendations using AI"""
-    # Call the recommendation service to generate new recommendations
-    create_recommendations(current_user.id, db)
+    """
+    Generate new personalized health recommendations using LangGraph.
 
-    # Fetch and return the newly created recommendations
-    recommendations = db.query(Recommendation).filter(
-        Recommendation.user_id == current_user.id
-    ).order_by(Recommendation.created_at.desc()).all()
+    This endpoint uses the AssistantService which invokes a LangGraph
+    recommendations flow with the user's health data.
+    """
+    # Initialize assistant service (uses LangGraph)
+    assistant = AssistantService(db, current_user)
+
+    # Generate recommendations via LangGraph
+    recommendations = assistant.generate_recommendations()
 
     return recommendations
