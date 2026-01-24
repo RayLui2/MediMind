@@ -320,30 +320,6 @@
   color: var(--text-gray);
 }
 
-.check-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 2px solid var(--border-color);
-  background: white;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-}
-
-.check-btn:hover {
-  border-color: var(--success);
-  background: rgba(16, 185, 129, 0.1);
-}
-
-.check-btn.checked {
-  background: var(--success);
-  border-color: var(--success);
-  color: white;
-}
-
 /* Vital Signs Chart */
 .chart-container {
   position: relative;
@@ -628,7 +604,7 @@
 /* Multiple Checkboxes for Medications */
 .checkbox-group {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.5rem;
   align-items: center;
 }
 
@@ -636,36 +612,37 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.15rem;
 }
 
 .dose-label {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: var(--text-gray);
   font-weight: 500;
 }
 
 .check-btn {
-  width: 2rem;
-  height: 2rem;
-  border: 2px solid var(--primary-blue);
-  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 4px;
   background-color: white;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem;
-  transition: all 0.2s;
+  font-size: 0.7rem;
+  transition: all 0.15s ease;
 }
 
 .check-btn:hover {
-  background-color: rgba(46, 94, 170, 0.1);
-  transform: scale(1.05);
+  border-color: var(--primary-blue);
+  background-color: rgba(46, 94, 170, 0.05);
 }
 
 .check-btn.checked {
   background-color: var(--primary-blue);
+  border-color: var(--primary-blue);
   color: white;
 }
 

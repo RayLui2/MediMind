@@ -1,7 +1,6 @@
 # Standard library
 import asyncio
 import json
-import os
 import traceback
 from typing import List
 
@@ -9,8 +8,6 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from langchain.chat_models import init_chat_model
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from sqlalchemy.orm import Session
 
 # Local
@@ -19,10 +16,8 @@ from app.models.conversations import Conversation
 from app.models.message import Message
 from app.models.user import User
 from app.schemas.chat import ConversationResponse, ConversationWithMessages, MessageCreate, MessageResponse
-from app.services.chat_service import update_instructions
+from app.services.assistant_service import AssistantService
 from app.utils.security import verify_token
-from assistant.chat import assistant_graph
-from assistant.system_prompt import system_prompt
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 security = HTTPBearer()
@@ -35,20 +30,20 @@ def get_current_user(
     """Get current authenticated user"""
     token = credentials.credentials
     email = verify_token(token)
-    
+
     if not email:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token"
         )
-    
+
     user = db.query(User).filter(User.email == email).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found"
         )
-    
+
     return user
 
 
@@ -60,11 +55,17 @@ async def stream_chat_message(
     db: Session = Depends(get_db)
 ):
     """
-    Send a message and get streaming AI response.
+    Send a message and get streaming AI response using LangGraph.
+
+    This endpoint uses astream_events to get token-level streaming from the
+    LangGraph chatbot node, while the summarizer runs in parallel for title generation.
 
     If conversation_id is provided, adds to existing conversation.
     Otherwise, creates a new conversation.
     """
+    # Initialize assistant service (uses LangGraph)
+    assistant = AssistantService(db, user)
+
     # Get or create conversation
     if conversation_id:
         conversation = db.query(Conversation).filter(
@@ -97,42 +98,16 @@ async def stream_chat_message(
     db.commit()
     db.refresh(user_message)
 
-    # Generate title using summarizer for new conversations
-    if not conversation_id and conversation.title == "New Chat":  # Only for new conversations
-        try:
-            # Call summarizer node directly instead of the full graph
-            from ..services.chat_service import create_summarizer_node
-            summarizer_node = create_summarizer_node()
-
-            # Import State for the summarizer
-            from assistant.state import State
-
-            # Create a minimal state with just the message
-            state = State(
-                messages=[SystemMessage(content=system_prompt), HumanMessage(content=message.content)],
-                conversation_title="New Chat"
-            )
-
-            # Run summarizer directly
-            result = summarizer_node(state)
-
-            # Extract conversation_title from result
-            if result.get("conversation_title") and result["conversation_title"] != "New Chat":
-                conversation.title = result["conversation_title"]
-                db.commit()
-                db.refresh(conversation)
-
-        except Exception as e:
-            traceback.print_exc()
+    # Track if this is a new conversation (title will come from LangGraph summarizer)
+    is_new_conversation = not conversation_id and conversation.title == "New Chat"
 
     # Create async generator for SSE format
     async def event_generator():
+        nonlocal conversation
         full_response = ""
+        new_title = None
 
-        # Refresh conversation to get updated title
-        db.refresh(conversation)
-
-        # Send conversation metadata first (with updated title)
+        # Send conversation metadata first
         metadata = {
             "type": "metadata",
             "conversation_id": conversation.id,
@@ -142,79 +117,45 @@ async def stream_chat_message(
         }
         yield f"data: {json.dumps(metadata)}\n\n"
 
-        # Prepare messages for LLM
-        messages = []
-
-        # Load history from DB
-        db_messages = db.query(Message).filter(
-            Message.conversation_id == conversation.id
-        ).order_by(Message.created_at.desc()).limit(10).all()
-
-        db_messages = list(reversed(db_messages))
-
-        instructions = metadata["instructions"] if metadata["instructions"] else []
-
-        if db_messages:
-            messages.append(SystemMessage(content=system_prompt))
-            if instructions:
-                messages[0] = SystemMessage(content=f"{system_prompt}\nUser instructions:\n{instructions}")
-            for msg in db_messages:
-                if msg.role == "user":
-                    messages.append(HumanMessage(content=msg.content))
-                elif msg.role == "assistant":
-                    messages.append(AIMessage(content=msg.content))
-        else:
-            messages.append(SystemMessage(content=f"{system_prompt}\n{instructions}"))
-
-        updated_instructions = update_instructions(messages[-1].content, instructions)
-        if instructions != updated_instructions:
-            messages[0] = SystemMessage(content=f"{system_prompt}\n{updated_instructions}")
-            metadata["instructions"] = updated_instructions
-
-            conversation.instructions = updated_instructions
-            db.add(conversation)
-            db.commit()
-            db.refresh(conversation)
-
-        # Add user info to current message if available
-        if user.name or user.age:
-            enhanced_content = f"""
-User information:
-- Name: {user.name if user.name else 'Unknown'}
-- Age: {user.age if user.age else 'Unknown'}
-
-User message:
-{message.content}
-"""
-            messages.append(HumanMessage(content=enhanced_content))
-        else:
-            messages.append(HumanMessage(content=message.content))
-
-        # Stream directly from LLM (bypass LangGraph for streaming)
-        try:           
-            # Initialize LLM
-            llm = init_chat_model(
-                os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-                model_provider="google_genai",
-                api_key=os.getenv("GEMINI_API_KEY"),
-                temperature=0.2,
-            )
-
-            # Stream tokens from LLM
-            chunk_count = 0
-
-            for chunk in llm.stream(messages):
-                if hasattr(chunk, 'content') and chunk.content:
-                    token = chunk.content
-                    full_response += token
-                    chunk_count += 1
-
-                    # Yield each token immediately as SSE chunk
-                    chunk_data = {"type": "chunk", "text": token}
+        # Stream chat response via LangGraph (astream_events)
+        # The graph runs summarizer and chatbot in parallel:
+        # - Summarizer generates title (for new conversations)
+        # - Chatbot streams response tokens
+        try:
+            async for event in assistant.stream_chat(message.content, conversation):
+                if event["type"] == "chunk":
+                    # Stream response tokens to client
+                    full_response += event["text"]
+                    chunk_data = {"type": "chunk", "text": event["text"]}
                     yield f"data: {json.dumps(chunk_data)}\n\n"
-
-                    # Force async yield to prevent buffering
                     await asyncio.sleep(0)
+
+                elif event["type"] == "title":
+                    # Title generated by summarizer node (runs in parallel)
+                    new_title = event["title"]
+                    if is_new_conversation and new_title and new_title != "New Chat":
+                        # Update conversation title in DB
+                        conversation.title = new_title
+                        db.commit()
+                        db.refresh(conversation)
+                        # Send title update event to client
+                        title_data = {"type": "title", "conversation_title": new_title}
+                        yield f"data: {json.dumps(title_data)}\n\n"
+
+                elif event["type"] == "error":
+                    error_data = {"type": "error", "message": event["message"]}
+                    yield f"data: {json.dumps(error_data)}\n\n"
+                    return
+
+                elif event["type"] == "complete":
+                    full_response = event.get("full_response", full_response)
+                    # Check if title came from complete event (fallback)
+                    if not new_title and event.get("conversation_title"):
+                        new_title = event["conversation_title"]
+                        if is_new_conversation and new_title and new_title != "New Chat":
+                            conversation.title = new_title
+                            db.commit()
+                            db.refresh(conversation)
 
         except Exception as e:
             traceback.print_exc()
@@ -222,7 +163,7 @@ User message:
             yield f"data: {json.dumps(error_data)}\n\n"
             return
 
-        # Save assistant response
+        # Save assistant response to database
         assistant_message = Message(
             conversation_id=conversation.id,
             role="assistant",
@@ -232,7 +173,7 @@ User message:
         db.commit()
         db.refresh(assistant_message)
 
-        # Send completion
+        # Send completion event with final title
         completion_data = {
             "type": "complete",
             "assistant_message_id": assistant_message.id,
@@ -240,8 +181,9 @@ User message:
             "conversation_title": conversation.title
         }
         yield f"data: {json.dumps(completion_data)}\n\n"
+
     return StreamingResponse(
-        event_generator(), 
+        event_generator(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -249,7 +191,7 @@ User message:
             "X-Accel-Buffering": "no",
         }
     )
-    
+
 
 @router.get("/conversations", response_model=List[ConversationResponse])
 def get_conversations(
@@ -263,7 +205,7 @@ def get_conversations(
     conversations = db.query(Conversation).filter(
         Conversation.user_id == user.id
     ).order_by(Conversation.updated_at.desc()).all()
-    
+
     return conversations
 
 
@@ -280,13 +222,13 @@ def get_conversation(
         Conversation.id == conversation_id,
         Conversation.user_id == user.id
     ).first()
-    
+
     if not conversation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Conversation not found"
         )
-    
+
     return conversation
 
 
@@ -303,14 +245,14 @@ def delete_conversation(
         Conversation.id == conversation_id,
         Conversation.user_id == user.id
     ).first()
-    
+
     if not conversation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Conversation not found"
         )
-    
+
     db.delete(conversation)
     db.commit()
-    
+
     return {"message": "Conversation deleted successfully"}

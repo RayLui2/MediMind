@@ -280,3 +280,22 @@ export const getWaterIntakeRecommendation = async (): Promise<WaterIntakeRecomme
   );
   return response.data;
 };
+
+// ============ Recommendations API ============
+export interface Recommendation {
+  id: number;
+  user_id: number;
+  title: string;
+  recommendation: string;
+  created_at: string;
+}
+
+export const getRecommendations = async (): Promise<Recommendation[]> => {
+  const response = await axios.get(`${API_URL}/recommendations`, getAuthHeaders());
+  return response.data;
+};
+
+export const generateRecommendations = async (): Promise<Recommendation[]> => {
+  const response = await axios.post(`${API_URL}/recommendations/generate`, {}, getAuthHeaders());
+  return response.data;
+};

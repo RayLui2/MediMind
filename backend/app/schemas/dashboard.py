@@ -168,3 +168,22 @@ class WaterIntakeRecommendation(BaseModel):
     base_amount: float
     activity_adjustment: float
     cups: float  # oz / 8
+
+
+# ============ Recommendation Schemas ============
+class RecommendationResponse(BaseModel):
+    """Response schema for a single recommendation"""
+    id: int
+    user_id: int
+    title: str
+    recommendation: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RecommendationsListResponse(BaseModel):
+    """Response schema for list of recommendations"""
+    recommendations: List[RecommendationResponse]
+    generated_at: Optional[datetime] = None
