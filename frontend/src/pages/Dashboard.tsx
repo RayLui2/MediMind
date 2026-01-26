@@ -62,7 +62,8 @@ const Dashboard: React.FC = () => {
 
   // Form states for health profile modal
   const [profileWeight, setProfileWeight] = useState('');
-  const [profileHeight, setProfileHeight] = useState('');
+  const [profileHeightFeet, setProfileHeightFeet] = useState('');
+  const [profileHeightInches, setProfileHeightInches] = useState('');
   const [profileActivityLevel, setProfileActivityLevel] = useState('sedentary');
   const [profileConditions, setProfileConditions] = useState('');
   const [profileAllergies, setProfileAllergies] = useState('');
@@ -625,9 +626,14 @@ const Dashboard: React.FC = () => {
   const handleUpdateHealthProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Convert feet and inches to total inches
+      const feet = profileHeightFeet ? parseInt(profileHeightFeet) : 0;
+      const inches = profileHeightInches ? parseInt(profileHeightInches) : 0;
+      const totalInches = (feet * 12) + inches;
+
       const profileData = {
         current_weight: profileWeight ? parseInt(profileWeight) : undefined,
-        height: profileHeight ? parseInt(profileHeight) : undefined,
+        height: totalInches > 0 ? totalInches : undefined,
         activity_level: profileActivityLevel,
         current_conditions: profileConditions ? profileConditions.split(',').map((s) => s.trim()) : [],
         allergies: profileAllergies ? profileAllergies.split(',').map((s) => s.trim()) : [],
@@ -659,7 +665,16 @@ const Dashboard: React.FC = () => {
   const openHealthProfileModal = () => {
     if (healthProfile) {
       setProfileWeight(healthProfile.current_weight?.toString() || '');
-      setProfileHeight(healthProfile.height?.toString() || '');
+      // Convert total inches to feet and inches
+      if (healthProfile.height) {
+        const feet = Math.floor(healthProfile.height / 12);
+        const inches = healthProfile.height % 12;
+        setProfileHeightFeet(feet.toString());
+        setProfileHeightInches(inches.toString());
+      } else {
+        setProfileHeightFeet('');
+        setProfileHeightInches('');
+      }
       setProfileActivityLevel(healthProfile.activity_level || 'sedentary');
       setProfileConditions(healthProfile.current_conditions.join(', '));
       setProfileAllergies(healthProfile.allergies.join(', '));
@@ -1543,15 +1558,33 @@ const Dashboard: React.FC = () => {
                 />
               </div>
               <div className="form-group">
-                <label>Height (inches)</label>
-                <input
-                  type="number"
-                  step="1"
-                  placeholder="e.g., 68"
-                  value={profileHeight}
-                  onChange={(e) => setProfileHeight(e.target.value)}
-                  onWheel={(e) => e.currentTarget.blur()}
-                />
+                <label>Height</label>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      type="number"
+                      placeholder="Feet"
+                      value={profileHeightFeet}
+                      onChange={(e) => setProfileHeightFeet(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      min="0"
+                      max="8"
+                      step="1"
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      type="number"
+                      placeholder="Inches"
+                      value={profileHeightInches}
+                      onChange={(e) => setProfileHeightInches(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      min="0"
+                      max="11"
+                      step="1"
+                    />
+                  </div>
+                </div>
               </div>
               <div className="form-group">
                 <label>Activity Level</label>
