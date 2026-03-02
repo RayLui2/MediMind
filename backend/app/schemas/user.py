@@ -4,21 +4,21 @@ from datetime import datetime
 
 
 class UserResponse(BaseModel):
-     """
+    """
     Response model for user data.
     
     Backend sends this when returning user information.
     Does not include password_hash
     """
      
-     id: int
-     email: EmailStr
-     name: Optional[str] = None
-     age: Optional[int] = None
-     created_at: datetime
-     setup_completed_at: Optional[datetime] = None
+    id: int
+    email: EmailStr
+    name: Optional[str] = None
+    age: Optional[int] = None
+    created_at: datetime
+    setup_completed_at: Optional[datetime] = None
 
-     class Config:
+    class Config:
         from_attributes = True  # Allows converting SQLAlchemy models to Pydantic
         json_schema_extra = {
             "example": {
@@ -28,4 +28,4 @@ class UserResponse(BaseModel):
                 "age": 25,
                 "created_at": "2024-12-16T10:30:00"
             }
-        }
+    }
