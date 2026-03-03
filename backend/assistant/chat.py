@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from langgraph.graph import END, StateGraph
 
 # Local imports
+from assistant.nodes.triage import create_triage_node
 from assistant.nodes.chatbot import create_chatbot_node
 from assistant.nodes.summarizer import create_summarizer_node
 from assistant.state import State
@@ -32,15 +33,17 @@ def create_assistant_graph() -> StateGraph:
     graph_builder = StateGraph(State)
 
     # Create nodes
+    triage_node = create_triage_node()
     chatbot_node = create_chatbot_node()
     summarizer_node = create_summarizer_node()
 
     def fanout_node(state: State):
         """Pass-through node that triggers parallel execution"""
-        return state
+        return {}
 
     # Add nodes
     graph_builder.add_node("fanout", fanout_node)
+    graph_builder.add_node("triage", triage_node)
     graph_builder.add_node("chatbot", chatbot_node)
     graph_builder.add_node("summarizer", summarizer_node)
 
@@ -49,8 +52,11 @@ def create_assistant_graph() -> StateGraph:
 
     # Add edges - fanout branches to both nodes in parallel
     graph_builder.add_edge("fanout", "summarizer")
-    graph_builder.add_edge("fanout", "chatbot")
+    graph_builder.add_edge("fanout", "triage")
 
+    # Add edge - triage to chatbot
+    graph_builder.add_edge("triage", "chatbot")
+    
     # Both nodes end independently
     graph_builder.add_edge("summarizer", END)
     graph_builder.add_edge("chatbot", END)

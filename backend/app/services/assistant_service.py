@@ -16,6 +16,7 @@ from assistant.chat import assistant_graph, create_assistant_graph, compile_grap
 from assistant.nodes.chatbot import get_streaming_queue, cleanup_streaming_queue
 from app.models.conversations import Conversation
 from app.models.message import Message
+from app.models.medication import Medication
 from app.models.health_profile import HealthProfile as HealthProfileDB
 from app.models.vital_sign import VitalSign as VitalSignDB
 from app.models.recommendations import Recommendation, RecommendationsResponse
@@ -87,6 +88,9 @@ class AssistantService:
             elif msg.role == "assistant":
                 messages.append(AIMessage(content=msg.content))
 
+        # Add user's medications
+        medications = self.db.query(Medication).filter(Medication.user_id == self.user.id).all()
+
         # Add current user message (will be enhanced by chatbot node if user_data exists)
         messages.append(HumanMessage(content=user_message))
 
@@ -97,7 +101,8 @@ class AssistantService:
             user_id=self.user.id,
             user_data=user_data,
             user_instructions={"instructions": instructions},
-            conversation_title=conversation.title or "New Chat"
+            conversation_title=conversation.title or "New Chat",
+            medications=medications
         )
 
         # Optionally load health data
@@ -158,9 +163,9 @@ class AssistantService:
             "user_data": state.user_data,
             "user_instructions": state.user_instructions,
             "conversation_title": state.conversation_title,
-            "chat_history": state.chat_history,
             "health_profile": state.health_profile.model_dump() if state.health_profile else None,
             "vital_signs": state.vital_signs.model_dump() if state.vital_signs else None,
+            "medications": [m.model_dump() for m in state.medications] if state.medications else None,
         }
 
         # Config for the graph invocation

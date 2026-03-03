@@ -11,7 +11,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 # Local
 from assistant.models.chat import ChatMessage
 from assistant.state import State
-from assistant.system_prompt import system_prompt
+from assistant.prompts.system_prompt import system_prompt
 
 load_dotenv()
 
