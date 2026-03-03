@@ -7,6 +7,8 @@ from typing import Optional, List
 from assistant.models.chat import ChatMessage
 from assistant.models.health_profile import HealthProfile
 from assistant.models.vital_sign import VitalSign
+from assistant.models.medications import Medication
+from assistant.models.triage import TriageResult
 
 def chat_history_reducer(curr_history: List[ChatMessage], new_chat: ChatMessage) -> List[ChatMessage]:
     return [*curr_history, new_chat]
@@ -39,3 +41,9 @@ class State(BaseModel):
 
     # Optional: vital signs of the user
     vital_signs: Optional[VitalSign] = None
+
+    # Optional: user's medications
+    medications: Optional[list[Medication]] = None
+
+    # Optional: triage result of last message
+    triage_result: Optional[TriageResult] = None
