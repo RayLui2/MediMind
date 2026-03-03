@@ -40,10 +40,11 @@ class State(BaseModel):
     health_profile: Optional[HealthProfile] = None
 
     # Optional: vital signs of the user
-    vital_signs: Optional[VitalSign] = None
+    vital_signs: Optional[list[VitalSign]] = None
 
     # Optional: user's medications
     medications: Optional[list[Medication]] = None
 
-    # Optional: triage result of last message
+    # Optional: triage result and retrieved context
     triage_result: Optional[TriageResult] = None
+    retrieved_context: Optional[str] = None  # drug info, condition facts, etc.
