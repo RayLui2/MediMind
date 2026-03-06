@@ -1,21 +1,17 @@
-from sqlalchemy import JSON, Column, Integer, String, DateTime, ForeignKey
-from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
-from app.database import Base
 from pydantic import BaseModel, Field
+from typing import Optional, List
+from datetime import datetime
+
 
 class Conversation(BaseModel):
-    """
-    Represents a chat conversation/session.
-    Each user can have multiple conversations.
-    """
+    """A chat conversation session between user and assistant"""
 
-    title = Field(String, default="New Chat")  # e.g. "Headache questions"
-    instructions = Field(JSON, default=list)  # List of instructions for the conversation
-    created_at = Field(DateTime(timezone=True), server_default=func.now())
-    updated_at = Field(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    id: Optional[int] = Field(default=None, description="Database record ID")
+    user_id: Optional[int] = Field(default=None, description="ID of the user this conversation belongs to")
+    title: Optional[str] = Field(default="New Chat", description="Short descriptive title generated from the first message, e.g. 'Headache questions', 'Medication side effects'")
+    instructions: List[str] = Field(default=[], description="Custom behavior instructions set by the user for this conversation, e.g. 'be concise', 'use bullet points'")
+    created_at: Optional[datetime] = Field(default=None, description="When this conversation was created")
+    updated_at: Optional[datetime] = Field(default=None, description="When this conversation was last updated")
 
-    # Relationship to User
-    user = relationship("User", back_populates="conversations")
-    # Relationship to messages
-    messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan")
+    class Config:
+        from_attributes = True
