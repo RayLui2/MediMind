@@ -93,6 +93,9 @@ def create_triage_node():
         ])
 
         print(f"triage_result: {response}")
+
+        if response.severity == "general" or response.severity == "off_topic":
+            return {"triage_result": response, "critic_approved": True}
         return {"triage_result": response}
 
     return triage_node

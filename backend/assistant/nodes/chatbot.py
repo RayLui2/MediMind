@@ -1,47 +1,54 @@
 # Standard library
 import os
-import asyncio
-from typing import Dict
 
 # Third-party
 from dotenv import load_dotenv
+from pydantic import BaseModel, Field
 from langchain.chat_models import init_chat_model
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import SystemMessage, AIMessage
 
 # Local
 from assistant.models.chat import ChatMessage
+from assistant.prompts.chatbot_prompt import chatbot_prompt
 from assistant.state import State
 
 load_dotenv()
 
-# Global queue for streaming tokens from the chatbot node
-# This allows the service layer to receive tokens as they're generated
-_streaming_queues: Dict[str, asyncio.Queue] = {}
+
+class llmResponseStructure(BaseModel):
+    content: str = Field(description="The full text content of the message")
 
 
-def get_streaming_queue(conversation_id: str) -> asyncio.Queue:
-    """Get or create a streaming queue for a conversation"""
-    if conversation_id not in _streaming_queues:
-        _streaming_queues[conversation_id] = asyncio.Queue()
-    return _streaming_queues[conversation_id]
+def generate_system_prompt(state: State) -> str:
+    prompt = chatbot_prompt
 
+    if state.user_instructions:
+        prompt += f"\n\n##User Instructions: {state.user_instructions}"
 
-def cleanup_streaming_queue(conversation_id: str):
-    """Remove the streaming queue after use"""
-    if conversation_id in _streaming_queues:
-        del _streaming_queues[conversation_id]
+    if state.triage_result:
+        triage = state.triage_result
+        prompt += f"\n\n## Triage\n- **Severity**: {triage.severity}\n- **Topic**: {triage.topic}"
+
+        if triage.severity == "emergency":
+            prompt += "\n\nIMPORTANT: This is an emergency. Lead your response by directing the user to call 911 or go to the ER immediately."
+        elif triage.severity == "clinical":
+            prompt += "\n\nThis requires professional medical evaluation. Recommend seeing a doctor promptly."
+        elif triage.severity == "off_topic":
+            prompt += "\n\nThis message is not health-related. Politely redirect the user to health topics."
+
+    if state.retrieved_context:
+        prompt += f"\n\n## Retrieved Context\n{state.retrieved_context}"
+
+    if state.draft_response:
+        prompt += f"\n\n## Draft Response\n{state.draft_response}"
+
+    if state.critique:
+        prompt += f"\n\n## Critique\nRevise your response addressing the following critique:\n{state.critique}"
+
+    return prompt
+
 
 def create_chatbot_node():
-    """
-    Create a chatbot node that streams responses via a queue.
-
-    This node uses astream to get tokens and pushes them to a queue,
-    which the service layer reads from to send to the client.
-
-    Returns:
-        A node function compatible with LangGraph
-    """
-
     llm = init_chat_model(
         os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
         model_provider="google_genai",
@@ -50,55 +57,17 @@ def create_chatbot_node():
         streaming=True,
     )
 
+    structured_llm = llm.with_structured_output(llmResponseStructure)
+
     async def chatbot_node(state: State):
-        """
-        Process user message and generate AI response with streaming.
+        messages = [SystemMessage(content=generate_system_prompt(state))] + list(state.messages)
 
-        This node:
-        1. Enhances the user message with user data and health context if available
-        2. Streams tokens to a queue for real-time delivery
-        3. Returns the complete response for state management
-
-        Args:
-            state: Current LangGraph state with messages, user_data, and health info
-
-        Returns:
-            Dict with updated messages and chat_history
-        """
-        # Handle state as either State object or dict
-        messages = list(state.messages)
-        conversation_id = state.conversation_id
-        retrieved_context = state.retrieved_context
-
-        # Enhance last user message with user data and health context if available
-        if len(messages) > 0 and isinstance(messages[-1], HumanMessage):
-            original_content = messages[-1].content
-
-            if retrieved_context:
-                enhanced_content = HumanMessage(content=f"{retrieved_context}\n\nUser message:\n{original_content}")
-                messages[-1] = enhanced_content
-
-        # Get the streaming queue for this conversation
-        conversation_id = str(conversation_id)
-        queue = get_streaming_queue(conversation_id)
-
-        # Stream tokens from LLM and push to queue
-        full_content = ""
-        async for chunk in llm.astream(messages):
-            if hasattr(chunk, 'content') and chunk.content:
-                token = chunk.content
-                full_content += token
-                # Push each token to the queue for streaming
-                await queue.put({"type": "token", "text": token})
-
-        # Signal end of streaming
-        await queue.put({"type": "end"})
-
-        response = AIMessage(content=full_content)
+        response = await structured_llm.ainvoke(messages)
 
         return {
-            "messages": [response],
-            "chat_history": [ChatMessage(role="assistant", content=response.content)]
+            "messages": [AIMessage(content=response.content)],
+            "chat_history": [ChatMessage(role="assistant", content=response.content)],
+            "draft_response": response.content
         }
 
     return chatbot_node
