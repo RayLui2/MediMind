@@ -48,3 +48,15 @@ class State(BaseModel):
     # Optional: triage result and retrieved context
     triage_result: Optional[TriageResult] = None
     retrieved_context: Optional[str] = None  # drug info, condition facts, etc.
+
+    # Optional: draft response of the chatbot
+    draft_response: Optional[str] = None
+
+    # Critic approval of draft
+    critic_approved: bool = False
+
+    # Optional: critique message from the critic node about the draft response if the response is critical
+    critique: Optional[str] = None
+
+    # Optional: revision count of the response
+    revision_count: int = 0
