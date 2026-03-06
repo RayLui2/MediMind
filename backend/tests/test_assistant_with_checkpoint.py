@@ -1,8 +1,7 @@
-import os
+# backend/test_assistant_with_checkpoint.py
 from dotenv import load_dotenv
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage
 from assistant.chat import assistant_graph
-from assistant.system_prompt import system_prompt
 
 load_dotenv()
 
@@ -16,7 +15,6 @@ def test_with_checkpoint():
     print("=== First Message ===")
     initial_state = {
         "messages": [
-            SystemMessage(content=system_prompt),
             HumanMessage(content="What causes headaches?")
         ],
         "chat_history": [],

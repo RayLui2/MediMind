@@ -11,9 +11,8 @@ from sqlalchemy.orm import Session
 
 # Local
 from assistant.state import State
-from assistant.prompts.system_prompt import system_prompt
 from assistant.chat import assistant_graph, create_assistant_graph, compile_graph
-from assistant.nodes.chatbot import get_streaming_queue, cleanup_streaming_queue
+from assistant.nodes.streaming import get_streaming_queue, cleanup_streaming_queue
 from app.models.conversations import Conversation
 from app.models.message import Message
 from app.models.medication import Medication
@@ -74,12 +73,6 @@ class AssistantService:
         # Build LangChain messages
         messages = []
         instructions = conversation.instructions or []
-
-        # Add system prompt with instructions
-        system_content = system_prompt
-        if instructions:
-            system_content = f"{system_prompt}\nUser instructions:\n{instructions}"
-        messages.append(SystemMessage(content=system_content))
 
         # Add conversation history (excluding current message)
         for msg in db_messages:
