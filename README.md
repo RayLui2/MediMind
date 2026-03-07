@@ -121,11 +121,13 @@ MediMind/
 │   │   └── utils/           # Utility functions
 │   │       └── security.py  # Security and auth utilities
 │   ├── assistant/           # LangGraph AI assistant
-│   │   ├── chat.py          # Main assistant graph
+│   │   ├── graph.py         # Main assistant graph (fanout → triage/summarizer → chatbot → critic → streaming)
 │   │   ├── state.py         # Assistant state management
-│   │   ├── system_prompt.py # System instructions
-│   │   ├── nodes/           # LangGraph nodes
-│   │   └── models/          # Assistant models
+│   │   ├── nodes/           # LangGraph nodes (triage, context_builder, chatbot, critic, streaming, summarizer)
+│   │   ├── models/          # Assistant Pydantic models
+│   │   ├── prompts/         # System prompt definitions
+│   │   └── README.md        # Assistant architecture documentation
+│   ├── cli_chat.py          # Terminal chat interface for testing the assistant locally
 │   ├── tests/               # Test suite
 │   │   ├── test_assistant.py
 │   │   ├── test_gemini.py
@@ -248,19 +250,22 @@ Once the backend is running, visit:
 
 MediMind uses LangGraph to orchestrate AI conversations with advanced features:
 
-- **Modular Node Architecture**: Separate nodes for chat handling, summarization, and response generation
-- **Stateful Conversations**: PostgreSQL-backed checkpointing ensures conversation context is preserved
-- **Streaming Responses**: Real-time message streaming using Server-Sent Events for responsive UX
-- **Conversation Summarization**: Automatic summarization of chat history to maintain context efficiently
-- **Structured System Prompts**: Medical-focused system instructions optimized for healthcare guidance
+- **Triage Node**: Classifies every message by urgency (emergency / clinical / general / off-topic) and topic, using the user's health profile to escalate severity when relevant
+- **Context Builder**: Assembles a personalized health context from the user's conditions, medications, and vitals to inject into the chatbot prompt
+- **Chatbot Node**: Generates a response using Gemini with a structured system prompt that includes triage result, health context, and any critic feedback
+- **Critic Node**: Safety-reviews the draft response for contraindications, emergency escalation, and completeness — sends it back for revision if it fails (max 1 retry)
+- **Streaming Node**: Emits the approved response token-by-token via an asyncio queue consumed by SSE or the CLI
+- **Summarizer Node**: Runs in parallel with triage to auto-generate a conversation title from the first message
 
 The assistant workflow:
-1. User message received via REST API
-2. LangGraph processes message through defined nodes
-3. Context retrieved from PostgreSQL checkpoint
-4. Gemini generates response with medical expertise
-5. Response streamed back to frontend in real-time
-6. Conversation state saved to checkpoint for future reference
+1. `fanout` kicks off `triage` and `summarizer` in parallel
+2. `triage` classifies urgency and topic; `context_builder` assembles health context
+3. `chatbot` generates a draft response using Gemini
+4. `critic` reviews the draft — loops back to `chatbot` with feedback if unsafe
+5. `streaming` emits the approved response token-by-token to the client
+6. Conversation state is persisted via PostgreSQL checkpointing
+
+See [`backend/assistant/README.md`](backend/assistant/README.md) for the full graph diagram and node reference.
 
 ## Development
 
@@ -285,6 +290,12 @@ python tests/test_schemas.py
 python tests/test_security.py
 python tests/test_gemini.py
 python tests/test_assistant.py
+```
+
+**Chat with the assistant in the terminal** (no frontend or database needed):
+```bash
+cd backend
+python cli_chat.py
 ```
 
 **Frontend tests:**
