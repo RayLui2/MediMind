@@ -31,25 +31,6 @@ def get_medication_interaction_flags(rxcuis_list):
     # TODO Contact one of the reputable clinical API providers: FDB (First Databank) MedKnowledge, Wolters Kluwer (Medi-Span), or Certara (DIDB)
     return []
 
-TOPIC_CONTEXT_MAP = {
-    "medication": ["medications", "interactions"],
-    "dosage":     ["medications"],
-    "chest":      ["vitals", "conditions", "medications"],
-    "heart":      ["vitals", "conditions", "medications"],
-    "blood":      ["vitals", "conditions", "medications"],
-    "diet":       ["conditions"],
-    "weight":     ["vitals", "conditions"],
-    "pain":       ["conditions", "medications"],
-    "sleep":      ["conditions"],
-}
-
-SEVERITY_CONTEXT_MAP = {
-    "emergency": ["vitals", "conditions", "medications", "interactions"],
-    "clinical":  ["conditions", "medications", "interactions"],
-    "general":   ["conditions"],
-    "off_topic": [],
-}
-
 def create_context_builder_node():
     async def context_builder(state: State):
         user_data = state.user_data
@@ -78,49 +59,40 @@ def create_context_builder_node():
             
             retrieved_context = user_info
 
-        # Start from severity baseline
-        sections = set(SEVERITY_CONTEXT_MAP.get(triage.severity, []))
-
-        # Enrich based on topic keywords
-        for keyword, context_types in TOPIC_CONTEXT_MAP.items():
-            if keyword in topic_lower:
-                sections.update(context_types)
-
         # Build retrieved_context from sections
         parts = ["[HEALTH CONTEXT — use this to personalize and inform your response]\n"]
 
-        if "conditions" in sections and health_profile:
-            conditions = health_profile.current_conditions or []
-            allergies = health_profile.allergies or []
-            if conditions:
-                parts.append(f"Active Medical Conditions: {', '.join(conditions)}")
-            if allergies:
-                parts.append(f"Known Allergies: {', '.join(allergies)}")
-        if "medications" in sections and medications:
-            med_lines = []
-            for m in medications:
-                line = m.name
-                if m.frequency:
-                    line += f" ({m.frequency})"
-                med_lines.append(line)
-            parts.append(f"Active Medications: {', '.join(med_lines)}")
-        if "vitals" in sections and vital_signs:
-            vitals_lines = []
-            if vital_signs.systolic_bp and vital_signs.diastolic_bp:
-                vitals_lines.append(f"BP {vital_signs.systolic_bp}/{vital_signs.diastolic_bp} mmHg")
-            if vital_signs.heart_rate:
-                vitals_lines.append(f"HR {vital_signs.heart_rate} bpm")
-            if vital_signs.temperature:
-                vitals_lines.append(f"Temp {vital_signs.temperature}°F")
-            if vitals_lines and vital_signs.recorded_at:
-                recorded_str = vital_signs.recorded_at.strftime('%Y-%m-%d') if hasattr(vital_signs.recorded_at, 'strftime') else str(vital_signs.recorded_at)[:10]
-                parts.append(f"Recent Vitals (recorded {recorded_str}")
+        # Conditions
+        conditions = health_profile.current_conditions or []
+        allergies = health_profile.allergies or []
+        if conditions:
+            parts.append(f"Active Medical Conditions: {', '.join(conditions)}")
+        if allergies:
+            parts.append(f"Known Allergies: {', '.join(allergies)}")
+        # Medications
+        med_lines = []
+        for m in medications:
+            line = m.name
+            if m.frequency:
+                line += f" ({m.frequency})"
+            med_lines.append(line)
+        parts.append(f"Active Medications: {', '.join(med_lines)}")
+
+        # Vitals
+        vitals_lines = []
+        if vital_signs.systolic_bp and vital_signs.diastolic_bp:
+            vitals_lines.append(f"BP {vital_signs.systolic_bp}/{vital_signs.diastolic_bp} mmHg")
+        if vital_signs.heart_rate:
+            vitals_lines.append(f"HR {vital_signs.heart_rate} bpm")
+        if vital_signs.temperature:
+            vitals_lines.append(f"Temp {vital_signs.temperature}°F")
+        if vitals_lines and vital_signs.recorded_at:
+            recorded_str = vital_signs.recorded_at.strftime('%Y-%m-%d') if hasattr(vital_signs.recorded_at, 'strftime') else str(vital_signs.recorded_at)[:10]
+            parts.append(f"Recent Vitals (recorded {recorded_str}")
 
         retrieved_context = "\n".join(parts)
-        print(f"retrieved_context: {retrieved_context}")
         
-        if len(parts) == 1:  # only the header was added
-            return {"retrieved_context": None}
+        print(f"retrieved_context: {retrieved_context}")
         return {"retrieved_context": retrieved_context}
 
     return context_builder
