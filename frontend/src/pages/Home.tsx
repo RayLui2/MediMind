@@ -265,11 +265,6 @@ const Home: React.FC = () => {
 
       {/* Footer */}
       <footer className="footer">
-        {/* <div className="footer-wave">
-          <svg viewBox="0 0 1200 120" preserveAspectRatio="none">
-            <path d="M0,0 C150,100 350,0 600,50 C850,100 1050,0 1200,50 L1200,120 L0,120 Z" />
-          </svg>
-        </div> */}
         <div className="footer-content">
           <div className="footer-grid">
             {/* Brand Section */}
@@ -282,34 +277,41 @@ const Home: React.FC = () => {
                 Your trusted AI healthcare companion, making personal healthcare accessible and easy.
               </p>
               <div className="footer-social">
-                <div className="social-icon" aria-label="Facebook">
-                {/* <a href="#" className="social-icon" aria-label="Facebook"> */}
+                <div className="social-icon" aria-label="Github">
+                  <a href="https://github.com/RayLui2/MediMind" target="_blank" className="social-icon" aria-label="Facebook">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12,2.2467A10.00042,10.00042,0,0,0,8.83752,21.73419c.5.08752.6875-.21247.6875-.475,0-.23749-.01251-1.025-.01251-1.86249C7,19.85919,6.35,18.78423,6.15,18.22173A3.636,3.636,0,0,0,5.125,16.8092c-.35-.1875-.85-.65-.01251-.66248A2.00117,2.00117,0,0,1,6.65,17.17169a2.13742,2.13742,0,0,0,2.91248.825A2.10376,2.10376,0,0,1,10.2,16.65923c-2.225-.25-4.55-1.11254-4.55-4.9375a3.89187,3.89187,0,0,1,1.025-2.6875,3.59373,3.59373,0,0,1,.1-2.65s.83747-.26251,2.75,1.025a9.42747,9.42747,0,0,1,5,0c1.91248-1.3,2.75-1.025,2.75-1.025a3.59323,3.59323,0,0,1,.1,2.65,3.869,3.869,0,0,1,1.025,2.6875c0,3.83747-2.33752,4.6875-4.5625,4.9375a2.36814,2.36814,0,0,1,.675,1.85c0,1.33752-.01251,2.41248-.01251,2.75,0,.26251.1875.575.6875.475A10.0053,10.0053,0,0,0,12,2.2467Z"/>
+                    </svg>
+                  </a>
+                </div>
+                {/* <div className="social-icon" aria-label="Facebook">
+                <a href="#" className="social-icon" aria-label="Facebook">
                   <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                   </svg>
-                {/* </a> */}
-                </div>
-                <div className="social-icon" aria-label="Twitter">
-                {/* <a href="#" className="social-icon" aria-label="Twitter"> */}
+                </a>
+                </div> */}
+                {/* <div className="social-icon" aria-label="Twitter">
+                <a href="#" className="social-icon" aria-label="Twitter">
                   <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
                   </svg>
-                {/* </a> */}
-                </div>
-                <div className="social-icon" aria-label="LinkedIn">
-                {/* <a href="#" className="social-icon" aria-label="LinkedIn"> */}
+                </a>
+                </div> */}
+                {/* <div className="social-icon" aria-label="LinkedIn">
+                <a href="#" className="social-icon" aria-label="LinkedIn">
                   <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
                   </svg>
-                {/* </a> */}
-                </div>
-                <div className="social-icon" aria-label="Instagram">
-                {/* <a href="#" className="social-icon" aria-label="Instagram"> */}
+                </a>
+                </div> */}
+                {/* <div className="social-icon" aria-label="Instagram">
+                <a href="#" className="social-icon" aria-label="Instagram">
                   <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 0C8.74 0 8.333.015 7.053.072 5.775.132 4.905.333 4.14.63c-.789.306-1.459.717-2.126 1.384S.935 3.35.63 4.14C.333 4.905.131 5.775.072 7.053.012 8.333 0 8.74 0 12s.015 3.667.072 4.947c.06 1.277.261 2.148.558 2.913.306.788.717 1.459 1.384 2.126.667.666 1.336 1.079 2.126 1.384.766.296 1.636.499 2.913.558C8.333 23.988 8.74 24 12 24s3.667-.015 4.947-.072c1.277-.06 2.148-.262 2.913-.558.788-.306 1.459-.718 2.126-1.384.666-.667 1.079-1.335 1.384-2.126.296-.765.499-1.636.558-2.913.06-1.28.072-1.687.072-4.947s-.015-3.667-.072-4.947c-.06-1.277-.262-2.149-.558-2.913-.306-.789-.718-1.459-1.384-2.126C21.319 1.347 20.651.935 19.86.63c-.765-.297-1.636-.499-2.913-.558C15.667.012 15.26 0 12 0zm0 2.16c3.203 0 3.585.016 4.85.071 1.17.055 1.805.249 2.227.415.562.217.96.477 1.382.896.419.42.679.819.896 1.381.164.422.36 1.057.413 2.227.057 1.266.07 1.646.07 4.85s-.015 3.585-.074 4.85c-.061 1.17-.256 1.805-.421 2.227-.224.562-.479.96-.899 1.382-.419.419-.824.679-1.38.896-.42.164-1.065.36-2.235.413-1.274.057-1.649.07-4.859.07-3.211 0-3.586-.015-4.859-.074-1.171-.061-1.816-.256-2.236-.421-.569-.224-.96-.479-1.379-.899-.421-.419-.69-.824-.9-1.38-.165-.42-.359-1.065-.42-2.235-.045-1.26-.061-1.649-.061-4.844 0-3.196.016-3.586.061-4.861.061-1.17.255-1.814.42-2.234.21-.57.479-.96.9-1.381.419-.419.81-.689 1.379-.898.42-.166 1.051-.361 2.221-.421 1.275-.045 1.65-.06 4.859-.06l.045.03zm0 3.678c-3.405 0-6.162 2.76-6.162 6.162 0 3.405 2.76 6.162 6.162 6.162 3.405 0 6.162-2.76 6.162-6.162 0-3.405-2.76-6.162-6.162-6.162zM12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7.846-10.405c0 .795-.646 1.44-1.44 1.44-.795 0-1.44-.646-1.44-1.44 0-.794.646-1.439 1.44-1.439.793-.001 1.44.645 1.44 1.439z"/>
                   </svg>
-                {/* </a> */}
-                </div>
+                </a>
+                </div> */}
               </div>
             </div>
 
@@ -325,7 +327,7 @@ const Home: React.FC = () => {
             </div>
 
             {/* Resources */}
-            <div className="footer-section">
+            {/* <div className="footer-section">
               <h4 className="footer-heading">Resources</h4>
               <ul className="footer-links">
                 <li><a>Help Center</a></li>
@@ -333,10 +335,10 @@ const Home: React.FC = () => {
                 <li><a>Terms of Service</a></li>
                 <li><a>Medical Disclaimer</a></li>
               </ul>
-            </div>
+            </div> */}
 
             {/* Newsletter */}
-            <div className="footer-section">
+            {/* <div className="footer-section">
               <h4 className="footer-heading">Stay Updated</h4>
               <p className="footer-newsletter-text">
                 Get health tips and updates delivered to your inbox.
@@ -353,7 +355,7 @@ const Home: React.FC = () => {
                   </svg>
                 </button>
               </div>
-            </div>
+            </div> */}
           </div>
 
           {/* Bottom Bar */}
@@ -364,12 +366,12 @@ const Home: React.FC = () => {
                 © {new Date().getFullYear()} MediMind. All rights reserved.
               </p>
               <div className="footer-badges">
-                <span className="footer-badge">
+                {/* <span className="footer-badge">
                   <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/>
                   </svg>
                   HIPAA Compliant
-                </span>
+                </span> */}
                 <span className="footer-badge">
                   <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
