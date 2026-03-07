@@ -127,6 +127,16 @@ MediMind/
 │   │   ├── models/          # Assistant Pydantic models
 │   │   ├── prompts/         # System prompt definitions
 │   │   └── README.md        # Assistant architecture documentation
+│   ├── migrations/          # SQL migration files
+│   │   ├── 001_create_users.sql
+│   │   ├── 002_create_conversations.sql
+│   │   ├── 003_create_messages.sql
+│   │   ├── 004_create_health_profiles.sql
+│   │   ├── 005_create_medications.sql
+│   │   ├── 006_create_medication_logs.sql
+│   │   ├── 007_create_vital_signs.sql
+│   │   ├── 008_create_recommendations.sql
+│   │   └── 009_create_water_intakes.sql
 │   ├── cli_chat.py          # Terminal chat interface for testing the assistant locally
 │   ├── tests/               # Test suite
 │   │   ├── test_assistant.py
@@ -271,12 +281,10 @@ See [`backend/assistant/README.md`](backend/assistant/README.md) for the full gr
 
 ### Database Setup
 
-1. Create the database tables:
+1. Run the SQL migrations in order:
    ```bash
    cd backend
-   python create_tables.py
-   python create_chat_tables.py
-   python create_dashboard_tables.py
+   for f in migrations/*.sql; do psql $DATABASE_URL -f "$f"; done
    ```
 
 ### Running Tests
