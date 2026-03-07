@@ -206,10 +206,6 @@ export const createVitalSign = async (data: {
   return response.data;
 };
 
-export const deleteVitalSign = async (vitalId: number): Promise<void> => {
-  await axios.delete(`${API_URL}/vital-signs/${vitalId}`, getAuthHeaders());
-};
-
 // ============ Dashboard Summary API ============
 export const getDashboardSummary = async (): Promise<DashboardSummary> => {
   const response = await axios.get(`${API_URL}/summary`, getAuthHeaders());
@@ -226,14 +222,6 @@ export const completeSetup = async (data: {
   family_history: string[];
 }): Promise<{ success: boolean; message: string }> => {
   const response = await axios.post(`${API_URL}/setup/complete`, data, getAuthHeaders());
-  return response.data;
-};
-
-export const getSetupStatus = async (): Promise<{
-  setup_complete: boolean;
-  setup_completed_at?: string;
-}> => {
-  const response = await axios.get(`${API_URL}/setup/status`, getAuthHeaders());
   return response.data;
 };
 
