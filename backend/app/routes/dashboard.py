@@ -27,7 +27,6 @@ from app.schemas.dashboard import (
     MedicationResponse,
     MedicationUpdate,
     RecommendationResponse,
-    RecommendationsListResponse,
     SetupCompleteRequest,
     SetupCompleteResponse,
     SetupStatusResponse,
