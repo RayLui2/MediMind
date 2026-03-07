@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 # Local
 from assistant.state import State
-from assistant.chat import assistant_graph, create_assistant_graph, compile_graph
+from assistant.graph import assistant_graph
 from assistant.nodes.streaming import get_streaming_queue, cleanup_streaming_queue
 from app.models.conversations import Conversation
 from app.models.message import Message

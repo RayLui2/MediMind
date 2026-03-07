@@ -1,7 +1,7 @@
 # backend/test_assistant_with_checkpoint.py
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
-from assistant.chat import assistant_graph
+from assistant.graph import assistant_graph
 
 load_dotenv()
 

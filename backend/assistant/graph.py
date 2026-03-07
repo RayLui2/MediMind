@@ -11,7 +11,7 @@ from assistant.nodes.triage import create_triage_node
 from assistant.nodes.chatbot import create_chatbot_node
 from assistant.nodes.context_builder import create_context_builder_node
 from assistant.nodes.critic import create_critic_node
-from backend.assistant.nodes.streaming import create_streaming_node
+from assistant.nodes.streaming import create_streaming_node
 from assistant.nodes.summarizer import create_summarizer_node
 
 load_dotenv()
@@ -38,7 +38,7 @@ def create_assistant_graph() -> StateGraph:
     """
     def route_chatbot(state: State):
         if state.critic_approved or state.revision_count >= 2:
-            return END
+            return "streaming"
         return "chatbot"
     
     workflow = StateGraph(State)
@@ -52,8 +52,8 @@ def create_assistant_graph() -> StateGraph:
     summarizer_node = create_summarizer_node()
 
     def fanout_node(state: State):
-        """Pass-through node that triggers parallel execution"""
-        return {}
+        """Pass-through node that triggers parallel execution. Reset critic loop state per turn."""
+        return {"critic_approved": False, "revision_count": 0}
 
     # Add nodes
     workflow.add_node("fanout", fanout_node)
