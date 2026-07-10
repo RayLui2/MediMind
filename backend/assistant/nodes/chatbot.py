@@ -65,8 +65,6 @@ def create_chatbot_node():
         response = await structured_llm.ainvoke(messages)
 
         return {
-            "messages": [AIMessage(content=response.content)],
-            "chat_history": [ChatMessage(role="assistant", content=response.content)],
             "draft_response": response.content
         }
 
