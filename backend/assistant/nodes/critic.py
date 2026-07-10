@@ -5,7 +5,7 @@ from typing import Optional
 # Third-party
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 # Local
 from assistant.state import State
@@ -64,12 +64,21 @@ def create_critic_node():
         triage_result = state.triage_result
         retrieved_context = state.retrieved_context
 
+        user_message = next(
+            (m.content for m in reversed(state.messages) if isinstance(m, HumanMessage)),
+            ""
+        )
+
         system_prompt = generate_system_prompt(retrieved_context, triage_result)
 
         response = await structured_llm.ainvoke([
             SystemMessage(content=system_prompt),
-            AIMessage(content=draft_response),
-            HumanMessage(content="Evaluate the above response for safety and accuracy. Approve it or provide a one-sentence critique.")
+            HumanMessage(content=(
+            f"User's question:\n{user_message}\n\n"
+            f"Assistant's draft response:\n{draft_response}\n\n"
+            "Evaluate the draft response above for safety and accuracy given the user's question. "
+            "Approve it or provide a one-sentence critique."
+            ))
         ])
 
         print(f"approved: {response.approved}, critique: {response.critique}, revision_count: {state.revision_count + 1}")
