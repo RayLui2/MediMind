@@ -158,6 +158,8 @@ You're currently protected by an accident: no checkpointer is used, so state is 
 **Lesson**: an evaluator is only as good as its evidence. When you add a judge, explicitly enumerate what it needs to see to make each judgment on its checklist.
 
 ### 3.7 Checkpointing is half-adopted
+**Status: ✅ Resolved** — checkpointer plumbing deleted; DB remains the source of truth (manual last-10-messages load). `thread_id` config, `compile_graph` checkpointer support, and the `langgraph-checkpoint-postgres` dependency removed.
+
 - `compile_graph()` supports a checkpointer, but production compiles without one (`graph.py:112`)
 - `thread_id` is passed in config on every invocation (`assistant_service.py:165`) — it does nothing without a checkpointer
 - `langgraph-checkpoint-postgres` is pinned in `requirements.txt` but never imported

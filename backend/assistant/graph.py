@@ -107,19 +107,16 @@ def create_assistant_graph() -> StateGraph:
     return workflow
 
 
-def compile_graph(graph_builder: StateGraph, checkpointer=None):
+def compile_graph(graph_builder: StateGraph):
     """
-    Compile the graph with optional checkpointer.
+    Compile the graph.
 
     Args:
         graph_builder: The StateGraph builder
-        checkpointer: Optional checkpointer for conversation persistence
 
     Returns:
         Compiled graph
     """
-    if checkpointer:
-        return graph_builder.compile(checkpointer=checkpointer)
     return graph_builder.compile()
 
 

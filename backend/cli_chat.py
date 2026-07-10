@@ -33,7 +33,6 @@ async def chat() -> None:
 
     graph = compile_graph(create_assistant_graph())
     messages: list = []
-    turn = 0
 
     while True:
         try:
@@ -49,13 +48,11 @@ async def chat() -> None:
             break
 
         messages.append(HumanMessage(content=user_input))
-        turn += 1
 
         state_dict = {
             "messages": messages,
             "conversation_id": CLI_CONVERSATION_ID,
         }
-        config = {"configurable": {"thread_id": f"cli_{turn}"}}
 
         # Set up streaming queue before launching graph
         queue = get_streaming_queue(str(CLI_CONVERSATION_ID))
@@ -65,7 +62,7 @@ async def chat() -> None:
         full_response = ""
 
         async def run_graph() -> None:
-            await graph.ainvoke(state_dict, config=config)
+            await graph.ainvoke(state_dict)
 
         graph_task = asyncio.create_task(run_graph())
 

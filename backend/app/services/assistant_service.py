@@ -161,9 +161,6 @@ class AssistantService:
             "medications": [m.model_dump() for m in state.medications] if state.medications else None,
         }
 
-        # Config for the graph invocation
-        config = {"configurable": {"thread_id": f"conversation_{conversation.id}"}}
-
         full_response = ""
         new_title = None
         conversation_id = str(conversation.id)
@@ -175,7 +172,7 @@ class AssistantService:
             # Create a task to run the graph in the background
             async def run_graph():
                 nonlocal new_title
-                async for event in self._graph.astream_events(state_dict, config=config, version="v2"):
+                async for event in self._graph.astream_events(state_dict, version="v2"):
                     event_type = event.get("event")
                     event_name = event.get("name", "")
 
@@ -264,10 +261,8 @@ class AssistantService:
             "vital_signs": state.vital_signs.model_dump() if state.vital_signs else None,
         }
 
-        config = {"configurable": {"thread_id": f"conversation_{conversation.id}"}}
-
         # Invoke the graph (runs all nodes)
-        result = await self._graph.ainvoke(state_dict, config=config)
+        result = await self._graph.ainvoke(state_dict)
 
         # Extract the AI response from messages
         ai_response = ""

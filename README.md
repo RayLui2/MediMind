@@ -30,7 +30,7 @@ MediMind is a comprehensive full-stack healthcare application that empowers user
 - **Symptom Logging**: Monitor and track symptoms over time to identify patterns
 - **Personalized Insights**: Receive AI-driven health recommendations based on your data
 - **Secure Health Records**: User authentication and encrypted health data management
-- **Stateful Conversations**: Persistent conversation history with PostgreSQL-backed checkpointing
+- **Stateful Conversations**: Conversation history stored in PostgreSQL; the assistant loads the last 10 messages per request for context
 
 ## Features
 
@@ -39,7 +39,7 @@ MediMind is a comprehensive full-stack healthcare application that empowers user
 - **AI Chat Interface**: Interactive chat with AI medical assistant powered by LangGraph and Gemini
 - **Streaming Responses**: Real-time AI message streaming using fetch API for instant feedback
 - **Conversation History**: Save and retrieve past medical conversations with auto-updating titles
-- **LangGraph Architecture**: Modular AI assistant with summarization nodes and checkpointing
+- **LangGraph Architecture**: Modular AI assistant with summarization nodes
 - **Health Dashboard**: Personal health data visualization and tracking with interactive charts
 - **Health Metrics Tracking**: Monitor vital signs including blood pressure, heart rate, and weight
 - **Symptom Tracker**: Log and track symptoms with severity levels and timestamps
@@ -73,7 +73,6 @@ MediMind is a comprehensive full-stack healthcare application that empowers user
 - **LangGraph** 0.2.51 - AI agent orchestration and workflow management
 - **LangChain** 0.3.21 - LLM application framework
 - **LangChain Google GenAI** 2.0.11 - Google Gemini integration
-- **LangGraph Checkpoint PostgreSQL** 2.0.10 - Conversation state persistence
 - **SQLAlchemy** 2.0.23 - SQL toolkit and ORM
 - **PostgreSQL** (via psycopg2-binary) - Database
 - **JWT Authentication** - Secure token-based auth
@@ -273,7 +272,7 @@ The assistant workflow:
 3. `chatbot` generates a draft response using Gemini
 4. `critic` reviews the draft — loops back to `chatbot` with feedback if unsafe
 5. `streaming` emits the approved response token-by-token to the client
-6. Conversation state is persisted via PostgreSQL checkpointing
+6. Conversation history is stored in PostgreSQL; the assistant reloads the last 10 messages from the DB each request (no checkpointer)
 
 See [`backend/assistant/README.md`](backend/assistant/README.md) for the full graph diagram and node reference.
 
