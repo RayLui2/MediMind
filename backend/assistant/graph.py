@@ -21,17 +21,19 @@ def create_assistant_graph() -> StateGraph:
     """
     Create and configure the LangGraph assistant graph.
 
-    Graph Structure:    
+    Graph Structure:
     [fanout] → [summarizer] → [END]
        ↓
-    [triage] → [context_builder] → [chatbot] → [critic] → [END | chatbot (loop)]
+    [triage] → [context_builder] → [chatbot] → [critic]* → [END | chatbot (loop)]
+    * skipped straight to streaming when triage already set critic_approved (general/off_topic)
 
     The summarizer, triage run in parallel:
     - Summarizer generates conversation title (for new conversations)
     - Triage determines the topic of the user's message
     - Context builder retrieves relevant context for the triage topic
     - Chatbot generates the AI response based on the context and the user's message
-    - Critic evaluates the response and decides if it is critical or not. If it is critical, go to the chatbot node from the critic node, otherwise go to the END node.
+    - If triage already approved the message (general/off_topic), chatbot routes straight to streaming, skipping critic.
+    - Otherwise, critic evaluates the response and decides if it is critical or not. If it is critical, go to the chatbot node from the critic node, otherwise go to the streaming node.
 
     Returns:
         StateGraph builder (not yet compiled)
@@ -40,6 +42,11 @@ def create_assistant_graph() -> StateGraph:
         if state.critic_approved or state.revision_count >= 2:
             return "streaming"
         return "chatbot"
+
+    def route_critic(state: State):
+        if state.critic_approved:
+            return "streaming"
+        return "critic"
     
     workflow = StateGraph(State)
 
@@ -74,7 +81,16 @@ def create_assistant_graph() -> StateGraph:
     # Add edge - triage to chatbot
     workflow.add_edge("triage", "context_builder")
     workflow.add_edge("context_builder", "chatbot")
-    workflow.add_edge("chatbot", "critic")
+
+    # Skip critic if triage already approved (general/off_topic)
+    workflow.add_conditional_edges(
+        "chatbot",
+        route_critic,
+        {
+            "streaming": "streaming",
+            "critic": "critic"
+        }
+    )
     
     # Both nodes end independently
     workflow.add_conditional_edges(

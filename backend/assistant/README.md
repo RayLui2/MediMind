@@ -21,13 +21,16 @@ The AI assistant is built with [LangGraph](https://github.com/langchain-ai/langg
               │            └───────┬───────┘
               │                    ▼
               │            ┌───────────────┐
-              │            │    chatbot    │◄──┐
-              │            └───────┬───────┘   │ (revision loop,
-              │                    ▼            │  max 2 retry)
-              │            ┌───────────────┐   │
-              │            │    critic     │───┘
-              │            └───────┬───────┘
-              │                    ▼
+              │            │    chatbot    │◄──────┐
+              │            └───────┬───────┘        │
+              │              critic_approved         │ (revision loop,
+              │              already True?           │  max 2 retry)
+              │              no ───┴─── yes          │
+              │              ▼           │           │
+              │       ┌───────────┐      │           │
+              │       │  critic   │──────┼───────────┘
+              │       └─────┬─────┘      │  (not approved & < 2 revisions
+              │             ▼            ▼   loops back to chatbot)
               │            ┌───────────────┐
               │            │   streaming   │
               │            └───────┬───────┘
@@ -38,6 +41,8 @@ The AI assistant is built with [LangGraph](https://github.com/langchain-ai/langg
 ```
 
 `fanout` kicks off `summarizer` and `triage` in **parallel**. Each branch ends at `END` independently — LangGraph merges state when both branches complete.
+
+`chatbot → critic` is a conditional edge: if `critic_approved` is already `True` (set by `triage` for `general`/`off_topic` messages), the graph routes straight to `streaming`, skipping the critic LLM call entirely. Otherwise it goes to `critic` as normal, which can loop back to `chatbot` up to 2 times before auto-approving.
 
 ---
 
@@ -84,7 +89,7 @@ Sends `[SystemMessage(prompt)] + conversation_history` to Gemini with structured
 **Output:** `draft_response`, appends to `messages` and `chat_history`
 
 ### `critic`
-Safety reviewer. Evaluates the chatbot's draft response for:
+Safety reviewer. Skipped entirely when `triage` already set `critic_approved: True` (`general`/`off_topic`) — see the `chatbot → critic` conditional edge above. Otherwise evaluates the chatbot's draft response for:
 1. Safety — does it recommend care at the right level?
 2. Contraindications — does it conflict with the user's conditions or medications?
 3. Emergency escalation — does it lead with 911/ER guidance when needed?
