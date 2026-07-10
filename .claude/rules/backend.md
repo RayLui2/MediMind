@@ -13,7 +13,7 @@ SQLAlchemy + PostgreSQL = persistence.
 
 ```bash
 cd backend
-source venv/bin/activate                # Python 3.9.6 venv
+source venv/bin/activate                # Python 3.12 venv (rebuilt 2026-07; code still targets 3.9 syntax)
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
