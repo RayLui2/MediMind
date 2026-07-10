@@ -171,6 +171,8 @@ So there are two competing persistence models, each ~50% implemented. The manual
 **Fix**: pick one. For this app I'd keep DB-as-source-of-truth (your messages table already drives the UI) and delete the checkpointer support, `thread_id` config, and the unused dependency. If you want to *learn* checkpointing, do it deliberately: compile with `PostgresSaver`, make `thread_id` the conversation id, stop re-loading history manually — and fix §3.5 first, or the checkpointer will faithfully persist your duplicated drafts.
 
 ### 3.8 Dead and broken auxiliary code
+**Status: 🔶 Partially resolved** — `state.chat_history`, its reducer, and the `ChatMessage` model (`models/chat.py`) are deleted; nothing read them. Still remaining: `safety.py`, `tools/update_instructions.py`, `get_rxcui_by_string`.
+
 - `nodes/safety.py` — an empty file containing one comment
 - `tools/update_instructions.py` — never imported anywhere; would crash if called (`response.instructions` doesn't exist on an `AIMessage`, declared return type `Command` doesn't match, `args_schema` says `dict` while the parameter says `List[str]`)
 - `state.chat_history` — written by two nodes, read by nothing; duplicates `messages`

@@ -5,10 +5,9 @@ import os
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from langchain.chat_models import init_chat_model
-from langchain_core.messages import SystemMessage, AIMessage
+from langchain_core.messages import SystemMessage
 
 # Local
-from assistant.models.chat import ChatMessage
 from assistant.prompts.chatbot_prompt import chatbot_prompt
 from assistant.state import State
 

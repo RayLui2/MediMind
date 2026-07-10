@@ -7,7 +7,6 @@ from langchain_core.messages import AIMessage
 
 # Local
 from assistant.state import State
-from assistant.models.chat import ChatMessage
 
 # Global queue for streaming tokens
 # Single source of truth — imported by chatbot.py and assistant_service.py
@@ -49,8 +48,7 @@ def create_streaming_node():
         response = AIMessage(content=draft_response)
 
         return {
-            "messages": [response],
-            "chat_history": [ChatMessage(role="assistant", content=response.content)]
+            "messages": [response]
         }
 
 

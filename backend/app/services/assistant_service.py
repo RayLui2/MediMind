@@ -256,7 +256,6 @@ class AssistantService:
             "user_data": state.user_data,
             "user_instructions": state.user_instructions,
             "conversation_title": state.conversation_title,
-            "chat_history": state.chat_history,
             "health_profile": state.health_profile.model_dump() if state.health_profile else None,
             "vital_signs": state.vital_signs.model_dump() if state.vital_signs else None,
         }

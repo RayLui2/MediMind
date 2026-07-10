@@ -86,7 +86,7 @@ The main response generator. Builds a system prompt that includes:
 
 Sends `[SystemMessage(prompt)] + conversation_history` to Gemini with structured output.
 
-**Output:** `draft_response`, appends to `messages` and `chat_history`
+**Output:** `draft_response`
 
 ### `critic`
 Safety reviewer. Skipped entirely when `triage` already set `critic_approved: True` (`general`/`off_topic`) — see the `chatbot → critic` conditional edge above. Otherwise evaluates the chatbot's draft response for:
@@ -102,7 +102,7 @@ If the draft fails, it returns a one-sentence critique and the chatbot revises. 
 ### `streaming`
 Emits the approved `draft_response` token by token into an `asyncio.Queue` keyed by `conversation_id`. The API layer (SSE) or CLI consumes this queue and sends tokens to the client in real time.
 
-**Output:** appends final `AIMessage` to `messages` and `chat_history`
+**Output:** appends final `AIMessage` to `messages`
 
 ---
 
@@ -113,7 +113,6 @@ Defined in `state.py` as a Pydantic `BaseModel`. Key fields:
 | Field | Type | Description |
 |---|---|---|
 | `messages` | `list` (add_messages) | Full conversation history as LangChain messages |
-| `chat_history` | `List[ChatMessage]` | Simplified chat history (role + content) |
 | `conversation_id` | `int` | DB conversation ID |
 | `user_id` | `int` | DB user ID |
 | `user_data` | `dict` | Basic user info (name, age) |
@@ -135,7 +134,7 @@ Defined in `state.py` as a Pydantic `BaseModel`. Key fields:
 
 ```
 assistant/
-├── chat.py               # Graph definition and compilation
+├── graph.py              # Graph definition and compilation
 ├── state.py              # LangGraph State (Pydantic)
 ├── nodes/
 │   ├── fanout            # (inline in chat.py)
@@ -146,7 +145,6 @@ assistant/
 │   ├── streaming.py      # Token streaming via asyncio.Queue
 │   └── summarizer.py     # Conversation title generator
 ├── models/
-│   ├── chat.py           # ChatMessage (role, content)
 │   ├── critic.py         # CriticResult (approved, critique)
 │   ├── triage.py         # TriageResult (severity, topic)
 │   ├── health_profile.py
