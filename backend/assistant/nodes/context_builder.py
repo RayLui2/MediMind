@@ -63,34 +63,40 @@ def create_context_builder_node():
         parts = ["[HEALTH CONTEXT — use this to personalize and inform your response]\n"]
 
         # Conditions
-        conditions = health_profile.current_conditions or []
-        allergies = health_profile.allergies or []
+        conditions = []
+        allergies = []
+        if health_profile:
+            conditions = health_profile.current_conditions
+            allergies = health_profile.allergies
         if conditions:
             parts.append(f"Active Medical Conditions: {', '.join(conditions)}")
         if allergies:
             parts.append(f"Known Allergies: {', '.join(allergies)}")
+        
         # Medications
         med_lines = []
-        for m in medications:
-            line = m.name
-            if m.frequency:
-                line += f" ({m.frequency})"
-            med_lines.append(line)
+        if medications:
+            for m in medications:
+                line = m.name
+                if m.frequency:
+                    line += f" ({m.frequency})"
+                med_lines.append(line)
         parts.append(f"Active Medications: {', '.join(med_lines)}")
 
         # Vitals
         vitals_lines = []
-        if vital_signs.systolic_bp and vital_signs.diastolic_bp:
-            vitals_lines.append(f"BP {vital_signs.systolic_bp}/{vital_signs.diastolic_bp} mmHg")
-        if vital_signs.heart_rate:
-            vitals_lines.append(f"HR {vital_signs.heart_rate} bpm")
-        if vital_signs.temperature:
-            vitals_lines.append(f"Temp {vital_signs.temperature}°F")
-        if vitals_lines and vital_signs.recorded_at:
-            recorded_str = vital_signs.recorded_at.strftime('%Y-%m-%d') if hasattr(vital_signs.recorded_at, 'strftime') else str(vital_signs.recorded_at)[:10]
-            parts.append(f"Recent Vitals (recorded {recorded_str}")
+        if vital_signs:
+            if vital_signs.systolic_bp and vital_signs.diastolic_bp:
+                vitals_lines.append(f"BP {vital_signs.systolic_bp}/{vital_signs.diastolic_bp} mmHg")
+            if vital_signs.heart_rate:
+                vitals_lines.append(f"HR {vital_signs.heart_rate} bpm")
+            if vital_signs.temperature:
+                vitals_lines.append(f"Temp {vital_signs.temperature}°F")
+            if vitals_lines and vital_signs.recorded_at:
+                recorded_str = vital_signs.recorded_at.strftime('%Y-%m-%d') if hasattr(vital_signs.recorded_at, 'strftime') else str(vital_signs.recorded_at)[:10]
+                parts.append(f"Recent Vitals (recorded {recorded_str}): {', '.join(vitals_lines)}")
 
-        retrieved_context = "\n".join(parts)
+        retrieved_context += "\n".join(parts)
         
         print(f"retrieved_context: {retrieved_context}")
         return {"retrieved_context": retrieved_context}

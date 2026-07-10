@@ -40,7 +40,7 @@ class State(BaseModel):
     health_profile: Optional[HealthProfile] = None
 
     # Optional: vital signs of the user
-    vital_signs: Optional[list[VitalSign]] = None
+    vital_signs: Optional[VitalSign] = None
 
     # Optional: user's medications
     medications: Optional[list[Medication]] = None
