@@ -65,7 +65,6 @@ AI-layer-only iteration (no web stack, no DB): `cd backend && python cli_chat.py
 * Known existing drift (fix when touching the area, don't silently work around it):
   * README documents `POST /chat/messages`; the real endpoint is `POST /chat/stream`
   * README documents `CORS_ORIGINS` env var; CORS is actually hardcoded in `app/main.py`
-  * `assistant/README.md` claims a critic skip for general messages that the code doesn't implement
 
 ---
 

@@ -137,13 +137,14 @@ assistant/
 ├── graph.py              # Graph definition and compilation
 ├── state.py              # LangGraph State (Pydantic)
 ├── nodes/
-│   ├── fanout            # (inline in chat.py)
+│   ├── fanout            # (inline in graph.py)
 │   ├── triage.py         # Urgency + topic classifier
 │   ├── context_builder.py# Retrieves relevant health context
 │   ├── chatbot.py        # Main response generator
 │   ├── critic.py         # Safety reviewer
 │   ├── streaming.py      # Token streaming via asyncio.Queue
-│   └── summarizer.py     # Conversation title generator
+│   ├── summarizer.py     # Conversation title generator
+│   └── recommendations.py# Recommendations node (used by graphs/recommendations.py)
 ├── models/
 │   ├── critic.py         # CriticResult (approved, critique)
 │   ├── triage.py         # TriageResult (severity, topic)
@@ -151,7 +152,8 @@ assistant/
 │   ├── vital_sign.py
 │   ├── medications.py
 │   ├── user.py
-│   └── conversations.py
+│   ├── conversations.py
+│   └── recommendations.py
 ├── prompts/
 │   └── chatbot_prompt.py # Base system prompt for chatbot
 ├── graphs/

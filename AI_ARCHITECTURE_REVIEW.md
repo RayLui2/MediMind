@@ -182,6 +182,8 @@ So there are two competing persistence models, each ~50% implemented. The manual
 **Lesson**: exploration code is healthy; *shipping* it isn't. Delete scaffolding once the direction is chosen — in AI projects especially, dead prompts/tools/state fields actively mislead the next reader (including future you) about what the system does.
 
 ### 3.9 Documentation drift
+**Status: ✅ Fixed** — `assistant/README.md` was rewritten to match the code: the graph is documented as living in `graph.py`, the conditional critic-skip edge is now both documented and actually implemented (via `route_critic` in `graph.py`, §3.1), and the state table is current. The residual `chat.py` reference in the file tree was corrected, the stale `README 2.md` duplicate was deleted, and the corresponding known-drift entry was removed from `.claude/rules/ops.md`.
+
 `assistant/README.md` says the graph lives in `chat.py` (it's `graph.py`), and documents the critic-skip for general messages that doesn't actually happen (§3.1). Docs that describe intent rather than behavior are worse than no docs when debugging.
 
 **Tip**: LangGraph can generate the diagram from the real graph — `graph.get_graph().draw_mermaid()` — so the picture can never lie.
