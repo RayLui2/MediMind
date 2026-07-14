@@ -208,5 +208,159 @@
     "profile": null,
     "expected": ["general"],
     "note": "Adversarial — condition mentioned but it's third-party education, not the user's symptom"
+  },
+  {
+    "id": 31,
+    "message": "My 2-year-old just drank some bleach from under the sink",
+    "profile": null,
+    "expected": ["emergency"],
+    "note": "Child poisoning — third-party but active emergency, not education"
+  },
+  {
+    "id": 32,
+    "message": "I cut my hand and the bleeding won't stop, it's been gushing for 20 minutes",
+    "profile": null,
+    "expected": ["emergency"],
+    "note": "Uncontrolled bleeding"
+  },
+  {
+    "id": 33,
+    "message": "My friend just collapsed and isn't responding when I shake him",
+    "profile": null,
+    "expected": ["emergency"],
+    "note": "Unresponsive person — third-party but active emergency"
+  },
+  {
+    "id": 34,
+    "message": "My glucose meter says 38 and I feel shaky and confused",
+    "profile": {"conditions": ["Type 1 Diabetes"], "medications": ["Insulin"], "allergies": []},
+    "expected": ["emergency"],
+    "note": "Severe hypoglycemia with neuro symptoms"
+  },
+  {
+    "id": 35,
+    "message": "I suddenly can't see anything out of my right eye",
+    "profile": null,
+    "expected": ["emergency"],
+    "note": "Sudden monocular vision loss"
+  },
+  {
+    "id": 36,
+    "message": "It burns when I pee and I've been going constantly for two days",
+    "profile": null,
+    "expected": ["clinical"],
+    "note": "UTI symptoms — needs a doctor, not an ER"
+  },
+  {
+    "id": 37,
+    "message": "I started lisinopril last week and now I have a dry cough that won't quit",
+    "profile": {"conditions": ["Hypertension"], "medications": ["Lisinopril"], "allergies": []},
+    "expected": ["clinical"],
+    "note": "Known ACE-inhibitor side effect — medication review needed"
+  },
+  {
+    "id": 38,
+    "message": "A mole on my back has gotten bigger and darker over the last month",
+    "profile": null,
+    "expected": ["clinical"],
+    "note": "Changing mole — dermatology referral, not urgent care"
+  },
+  {
+    "id": 39,
+    "message": "I've had a fever around 102 for three days now",
+    "profile": null,
+    "expected": ["clinical"],
+    "note": "Persistent fever > 48-72h"
+  },
+  {
+    "id": 40,
+    "message": "My ankle is still swollen and painful a week after I twisted it",
+    "profile": null,
+    "expected": ["clinical"],
+    "note": "Injury not improving on expected timeline"
+  },
+  {
+    "id": 41,
+    "message": "Do I really need to take a multivitamin every day?",
+    "profile": null,
+    "expected": ["general"],
+    "note": "Supplement education"
+  },
+  {
+    "id": 42,
+    "message": "How much protein should I eat if I lift weights three times a week?",
+    "profile": null,
+    "expected": ["general"],
+    "note": "Nutrition and fitness"
+  },
+  {
+    "id": 43,
+    "message": "Is it bad to drink coffee on an empty stomach?",
+    "profile": null,
+    "expected": ["general"],
+    "note": "Lifestyle question"
+  },
+  {
+    "id": 44,
+    "message": "When should I get my flu shot this year?",
+    "profile": null,
+    "expected": ["general"],
+    "note": "Preventive care scheduling"
+  },
+  {
+    "id": 45,
+    "message": "What SPF sunscreen should I use for everyday wear?",
+    "profile": null,
+    "expected": ["general"],
+    "note": "Preventive skincare"
+  },
+  {
+    "id": 46,
+    "message": "Can you help me write a resume for a nursing job?",
+    "profile": null,
+    "expected": ["off_topic"],
+    "note": "Adversarial — 'nursing' is a career keyword here, not a health question"
+  },
+  {
+    "id": 47,
+    "message": "What's the capital of France?",
+    "profile": null,
+    "expected": ["off_topic"],
+    "note": "Not health related"
+  },
+  {
+    "id": 48,
+    "message": "Recommend me a good sci-fi book for my vacation",
+    "profile": null,
+    "expected": ["off_topic"],
+    "note": "Not health related"
+  },
+  {
+    "id": 49,
+    "message": "I've been more short of breath than usual on my evening walks",
+    "profile": null,
+    "expected": ["general", "clinical"],
+    "note": "Escalation pair D, no profile — gradual exertional change, either label acceptable"
+  },
+  {
+    "id": 50,
+    "message": "I've been more short of breath than usual on my evening walks",
+    "profile": {"conditions": ["COPD"], "medications": ["Albuterol inhaler"], "allergies": []},
+    "expected": ["clinical"],
+    "note": "Escalation pair D, COPD — worsening dyspnea must escalate to clinical"
+  },
+  {
+    "id": 51,
+    "message": "I'm a nursing student — what are the classic symptoms of a heart attack?",
+    "profile": null,
+    "expected": ["general"],
+    "note": "Adversarial — heart-attack keywords but educational, no personal symptom"
+  },
+  {
+    "id": 52,
+    "message": "That movie last night gave me a heart attack, it was so scary!",
+    "profile": null,
+    "expected": ["off_topic", "general"],
+    "note": "Adversarial — idiomatic 'heart attack', no medical content"
   }
 ]

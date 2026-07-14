@@ -25,11 +25,11 @@ Free-tier quotas OBSERVED for gemini-2.5-flash (from 429 payloads, 2026-07):
   - default --delay 15 stays under 5 RPM (LangChain retries also count)
   - on a DAILY-quota 429 the run aborts immediately — every further call
     that day is guaranteed to fail and retries only burn more budget
-  - a full 30-case run does not fit in flash's daily budget; run the eval
+  - the full suite does not fit in flash's daily budget; run the eval
     on flash-lite (separate quota) or in daily chunks via --start/--limit
 
     cd backend
-    venv/bin/python evals/run_triage_eval.py --model gemini-2.5-flash-lite
+    venv/bin/python evals/run_triage_eval.py --model gemini-3.1-flash-lite
     venv/bin/python evals/run_triage_eval.py --start 8        # resume from case #8
     venv/bin/python evals/run_triage_eval.py --limit 5        # quick smoke run
     venv/bin/python evals/run_triage_eval.py --dry-run        # validate dataset, no API calls
