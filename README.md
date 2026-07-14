@@ -199,6 +199,12 @@ GEMINI_API_KEY=your-gemini-api-key-here
 # free-tier quota, separate from the main model's.
 GEMINI_MODEL=gemini-2.5-flash
 GEMINI_MODEL_FAST=gemini-3.1-flash-lite
+
+# LangSmith tracing (optional — per-node latency, token counts, revision-loop visibility)
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=your-langsmith-api-key-here
+LANGSMITH_PROJECT=medimind
+LANGSMITH_ENDPOINT=https://api.smith.langchain.com
 ```
 
 CORS is hardcoded in `backend/app/main.py` (allows `http://localhost:3000`).

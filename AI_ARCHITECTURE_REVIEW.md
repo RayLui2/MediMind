@@ -8,7 +8,7 @@ A learning-focused review of the LangGraph assistant in `backend/assistant/`, wr
 
 **For a first LangGraph project, this is well above average.** Most first projects are a single prompt wrapped in one node. You built a multi-node graph with parallel branches, conditional routing, a self-correction loop, structured outputs, and a clean service layer — those are real agent-architecture patterns, applied in a domain (health) where they actually make sense.
 
-The weaknesses were the classic first-project ones: a key optimization that silently never ran, "streaming" that was simulated rather than real, framework features (checkpointer) adopted halfway, transport concerns leaking into graph nodes, several crash paths on missing data, and no way to measure whether the AI components actually worked. Most of that list is now fixed (see §3 status markers) — real token streaming shipped, model routing landed, a triage eval exists, and failure now escalates instead of defaulting to "fine" (§4.4). What's left is no tracing (§4.6), a handful of dead files (§3.8), a pending critic-eval baseline (§4.5), and a real test suite (§4.8).
+The weaknesses were the classic first-project ones: a key optimization that silently never ran, "streaming" that was simulated rather than real, framework features (checkpointer) adopted halfway, transport concerns leaking into graph nodes, several crash paths on missing data, and no way to measure whether the AI components actually worked. Most of that list is now fixed (see §3 status markers) — real token streaming shipped, model routing landed, a triage eval exists, failure now escalates instead of defaulting to "fine" (§4.4), and LangSmith tracing is wired up (§4.6). What's left is a handful of dead files (§3.8), a pending critic-eval baseline (§4.5), and a real test suite (§4.8).
 
 None of that diminishes the learning value — in fact, the bugs here are *exactly* the bugs that teach you the most about how LangGraph and LLM systems behave.
 
@@ -235,6 +235,8 @@ You have two LLM classifiers (triage, critic) and no way to know if they work. T
 Once this exists, prompt changes become measurable engineering instead of vibes. **Eval-driven development is the defining skill of AI engineering** — having a committed eval suite in a resume project is genuinely differentiating.
 
 ### 4.6 Add tracing
+**Status: ✅ Done** (2026-07-14) — LangSmith wired up via `LANGSMITH_TRACING`/`LANGSMITH_API_KEY`/`LANGSMITH_PROJECT`/`LANGSMITH_ENDPOINT` in `backend/.env` (documented in the README env template). No code changes needed: every LLM call already goes through `get_llm()` → `init_chat_model()`, which `langchain-core` instruments automatically once those env vars are set (`langsmith` ships as its transitive dependency — nothing new to add to `requirements.txt`). Verified with a live `cli_chat.py` run against the `medimind-dev` project: the trace shows the full per-node state (triage → context_builder → chatbot → critic) with latency and token counts, confirming the tool would have caught §3.1 immediately had it existed then.
+
 One env var's worth of setup for LangSmith (or self-hosted Langfuse) gives you per-node latency, token counts, full prompt/response inspection, and revision-loop visibility. You cannot debug or optimize a multi-LLM pipeline from `print()` statements. This would have caught §3.1 immediately — you'd have seen critic calls on every general message.
 
 ### 4.7 Make `context_builder` do what its name promises
@@ -257,9 +259,9 @@ Today it formats data already in state. The design *wants* to be retrieval: use 
 | Serving | `invoke()` in a route handler | Service layer, SSE, background task + queue |
 | Dev tooling | Notebook | CLI harness, README with diagram |
 | Weak spots (original) | Everything | Dead code, no evals, simulated streaming, unguarded optionals |
-| Weak spots (current) | — | A few dead files (§3.8), no tracing (§4.6), critic eval baseline pending + broader test suite still open (§4.5, §4.8) |
+| Weak spots (current) | — | A few dead files (§3.8), critic eval baseline pending + broader test suite still open (§4.5, §4.8) |
 
-What it demonstrates to a reader of your resume: you can decompose an AI product into specialized LLM roles, wire non-trivial control flow, and think about safety in a regulated-ish domain. Real token streaming shipped (§3.2/§4.1) and a triage eval with numbers exists (§4.5: 98% accuracy, 12/12 emergency recall on the 52-case set, `gemini-3.1-flash-lite`). Fail-toward-safety is closed too (§4.4: triage errors escalate to `clinical`, unapproved emergency drafts are replaced by a 911-first fallback) — that one actually matters for a *safety* story, not just a resume line. What's left to go from "promising" to "impressive": tracing screenshots (§4.6) and baseline numbers for the critic eval built in §4.5.
+What it demonstrates to a reader of your resume: you can decompose an AI product into specialized LLM roles, wire non-trivial control flow, and think about safety in a regulated-ish domain. Real token streaming shipped (§3.2/§4.1) and a triage eval with numbers exists (§4.5: 98% accuracy, 12/12 emergency recall on the 52-case set, `gemini-3.1-flash-lite`). Fail-toward-safety is closed too (§4.4: triage errors escalate to `clinical`, unapproved emergency drafts are replaced by a 911-first fallback) — that one actually matters for a *safety* story, not just a resume line. LangSmith tracing is wired up and verified (§4.6). What's left to go from "promising" to "impressive": baseline numbers for the critic eval built in §4.5.
 
 ---
 
@@ -293,14 +295,14 @@ Original plan, for reference — everything is done except item 4 (dead code):
 4. **Delete the dead code** — `safety.py`, `tools/update_instructions.py`, `get_rxcui_by_string`, and the now-orphaned `test_assistant_with_checkpoint.py` (§3.8)
 5. ~~Model routing for triage/summarizer (§4.3)~~ — done
 6. ~~Grow the eval set and add a critic eval (§4.5)~~ — done 2026-07-14 (triage grown to 52 cases, 24-case critic eval built; baseline runs still pending, see below)
+7. ~~Add tracing (§4.6)~~ — done 2026-07-14 (LangSmith, verified via `cli_chat.py`)
 
 ### What's actually left, in priority order
 
 1. **Delete the dead code (§3.8)** — quick, low-risk cleanup: `safety.py`, `tools/update_instructions.py`, `get_rxcui_by_string`, `test_assistant_with_checkpoint.py`.
 2. **Run the critic eval baseline on the production model (§4.5)** — no code, just quota-gated runs of `run_critic_eval.py` on flash, chunked across two days (`--limit 18` / `--start 19`). The flash-lite iteration pass is already perfect (24/24, 2026-07-14), so this is confirmation on the model the critic actually uses. (Triage is fully baselined: 51/52, 12/12 emergency recall.)
-3. **Add tracing (§4.6)** — LangSmith/Langfuse, one env var's worth of setup.
-4. **Real test suite (§4.8)** — add `pytest` to `requirements.txt`, replace the print-and-eyeball scripts in `backend/tests/` with unit + mocked-LLM tests.
-5. **Topic-driven retrieval in `context_builder` (§4.7)** — lowest priority; a design upgrade, not a bug.
+3. **Real test suite (§4.8)** — add `pytest` to `requirements.txt`, replace the print-and-eyeball scripts in `backend/tests/` with unit + mocked-LLM tests.
+4. **Topic-driven retrieval in `context_builder` (§4.7)** — lowest priority; a design upgrade, not a bug.
 
 ---
 
