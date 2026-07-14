@@ -1,17 +1,11 @@
-# Standard library
-import os
-
 # Third-party
-from dotenv import load_dotenv
 from pydantic import BaseModel, Field
-from langchain.chat_models import init_chat_model
 from langchain_core.messages import SystemMessage
 
 # Local
+from assistant.llm import get_llm
 from assistant.prompts.chatbot_prompt import chatbot_prompt
 from assistant.state import State
-
-load_dotenv()
 
 
 class llmResponseStructure(BaseModel):
@@ -48,13 +42,7 @@ def generate_system_prompt(state: State) -> str:
 
 
 def create_chatbot_node():
-    llm = init_chat_model(
-        os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-        model_provider="google_genai",
-        api_key=os.getenv("GEMINI_API_KEY"),
-        temperature=0.2,
-        streaming=True,
-    )
+    llm = get_llm(temperature=0.2, streaming=True)
 
     structured_llm = llm.with_structured_output(llmResponseStructure)
 

@@ -16,7 +16,7 @@ interface Message {
 interface Conversation {
   id: number
   user_id: number
-  title: string
+  title: string | null
   created_at: string
   updated_at: string
   messages?: Message[]
@@ -345,7 +345,7 @@ const Chat: React.FC = () => {
                         <div className="chat-conversation-icon">💬</div>
                         <div className="chat-conversation-content">
                           <div className="chat-conversation-title">
-                            {convo.title}
+                            {convo.title || 'New Conversation'}
                           </div>
                           <div className="chat-conversation-time">
                             {formatTime(convo.updated_at)}

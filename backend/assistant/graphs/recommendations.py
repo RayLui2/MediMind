@@ -3,7 +3,6 @@ import os
 from typing import Optional, List, Any
 
 # Third-party imports
-from dotenv import load_dotenv
 from langgraph.graph import END, StateGraph
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -12,8 +11,6 @@ from sqlalchemy.orm import Session
 from assistant.nodes.recommendations import create_recommendations_node
 from assistant.models.health_profile import HealthProfile
 from assistant.models.vital_sign import VitalSign
-
-load_dotenv()
 
 
 class RecommendationsState(BaseModel):

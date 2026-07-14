@@ -24,7 +24,7 @@ class State(BaseModel):
     user_instructions: Optional[dict] = None   # e.g. {instructions: {"bullet_points", "concise"}}
 
     # Summary of the first message in the conversation
-    conversation_title: Optional[str] = "New Chat"
+    conversation_title: Optional[str] = None
 
     # Optional: health profile about the user
     health_profile: Optional[HealthProfile] = None

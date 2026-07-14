@@ -13,7 +13,7 @@ class Conversation(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    title = Column(String, default="New Chat")  # e.g. "Headache questions"
+    title = Column(String)  # e.g. "Headache questions"
     instructions = Column(JSON, default=list)  # List of instructions for the conversation
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

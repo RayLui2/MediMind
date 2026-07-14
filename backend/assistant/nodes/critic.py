@@ -1,17 +1,16 @@
 # Standard library
-import os
+import logging
 from typing import Optional
 
 # Third-party
-from dotenv import load_dotenv
-from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage
 
 # Local
+from assistant.llm import get_llm
 from assistant.state import State
 from assistant.models.critic import CriticResult
 
-load_dotenv()
+logger = logging.getLogger(__name__)
 
 def generate_system_prompt(retrieved_context: Optional[str], triage_result) -> str:
     context_section = f"\nUser health context:\n{retrieved_context}" if retrieved_context else ""
@@ -39,13 +38,7 @@ If the response passes all checks, approve it.
 If you find a problem, reject it with a one-sentence critique describing exactly what needs to be fixed."""
 
 def create_critic_node():
-    llm = init_chat_model(
-        os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-        model_provider="google_genai",
-        api_key=os.getenv("GEMINI_API_KEY"),
-        temperature=0.2,
-        streaming=False,
-    )
+    llm = get_llm(temperature=0.2, streaming=False)
 
     structured_llm = llm.with_structured_output(CriticResult)
 
@@ -81,7 +74,7 @@ def create_critic_node():
             ))
         ])
 
-        print(f"approved: {response.approved}, critique: {response.critique}, revision_count: {state.revision_count + 1}")
+        logger.info(f"approved: {response.approved}, critique: {response.critique}, revision_count: {state.revision_count + 1}")
         return {"critic_approved": response.approved, "critique": response.critique, "revision_count": state.revision_count + 1}
 
     return critic_node

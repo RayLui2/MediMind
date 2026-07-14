@@ -1,8 +1,13 @@
 # Standard library
+import logging
+
+# Third-party
 import requests
 
 # Local
 from assistant.state import State
+
+logger = logging.getLogger(__name__)
 
 def get_rxcui_by_string(medications):
     base_url = "https://rxnav.nlm.nih.gov/REST/rxcui.json"
@@ -22,7 +27,7 @@ def get_rxcui_by_string(medications):
             if rxcuis:
                 rxcuis_list.append(rxcuis[0])
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching data: {e}")
+        logger.error(f"Error fetching data: {e}")
         return None
 
     return rxcuis_list
@@ -46,8 +51,6 @@ def create_context_builder_node():
         triage = state.triage_result
         if not triage:
             return {"retrieved_context": None}
-
-        topic_lower = triage.topic.lower()
 
         # Add basic user info
         if user_data:
@@ -98,7 +101,7 @@ def create_context_builder_node():
 
         retrieved_context += "\n".join(parts)
         
-        print(f"retrieved_context: {retrieved_context}")
+        logger.debug(f"retrieved_context: {retrieved_context}")
         return {"retrieved_context": retrieved_context}
 
     return context_builder

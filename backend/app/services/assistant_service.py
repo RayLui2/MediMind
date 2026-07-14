@@ -1,11 +1,9 @@
 # Standard library
 import asyncio
-import os
+import logging
 from typing import AsyncGenerator, Dict, Any, List, Optional
 
 # Third-party
-from dotenv import load_dotenv
-from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from sqlalchemy.orm import Session
 
@@ -23,7 +21,7 @@ from app.models.user import User
 from assistant.models.health_profile import HealthProfile
 from assistant.models.vital_sign import VitalSign
 
-load_dotenv()
+logger = logging.getLogger(__name__)
 
 
 class AssistantService:
@@ -94,7 +92,7 @@ class AssistantService:
             user_id=self.user.id,
             user_data=user_data,
             user_instructions={"instructions": instructions},
-            conversation_title=conversation.title or "New Chat",
+            conversation_title=conversation.title,
             medications=medications
         )
 
@@ -172,18 +170,27 @@ class AssistantService:
             # Create a task to run the graph in the background
             async def run_graph():
                 nonlocal new_title
-                async for event in self._graph.astream_events(state_dict, version="v2"):
-                    event_type = event.get("event")
-                    event_name = event.get("name", "")
+                try:
+                    async for event in self._graph.astream_events(state_dict, version="v2"):
+                        event_type = event.get("event")
+                        event_name = event.get("name", "")
 
-                    # Capture the conversation title from summarizer node output
-                    if event_type == "on_chain_end" and "summarizer" in event_name.lower():
-                        output = event.get("data", {}).get("output", {})
-                        if isinstance(output, dict) and output.get("conversation_title"):
-                            title = output["conversation_title"]
-                            if title and title != "New Chat":
-                                new_title = title
-                                await queue.put({"type": "title", "title": new_title})
+                        # Capture the conversation title from summarizer node output
+                        if event_type == "on_chain_end" and "summarizer" in event_name.lower():
+                            output = event.get("data", {}).get("output", {})
+                            if isinstance(output, dict) and output.get("conversation_title"):
+                                title = output["conversation_title"]
+                                if title:
+                                    new_title = title
+                                    await queue.put({"type": "title", "title": new_title})
+                except Exception as e:
+                    # If the graph dies before the streaming node emits "end", the queue would
+                    # never unblock and the consumer would sit the full 60s wait_for timeout.
+                    # Push an error item so the consumer fails fast. Do NOT re-raise: the
+                    # consumer handles this item, and `await graph_task` below would otherwise
+                    # surface the same exception a second time.
+                    logger.exception("Graph execution failed during stream_chat")
+                    await queue.put({"type": "error", "message": str(e)})
 
             # Start the graph execution in background
             graph_task = asyncio.create_task(run_graph())
@@ -202,6 +209,9 @@ class AssistantService:
                         await asyncio.sleep(0)
                     elif item["type"] == "title":
                         yield {"type": "title", "title": item["title"]}
+                    elif item["type"] == "error":
+                        yield {"type": "error", "message": item["message"]}
+                        return
                     elif item["type"] == "end":
                         streaming_done = True
 
@@ -217,8 +227,7 @@ class AssistantService:
             await graph_task
 
         except Exception as e:
-            import traceback
-            traceback.print_exc()
+            logger.exception("stream_chat failed")
             yield {"type": "error", "message": str(e)}
             return
         finally:

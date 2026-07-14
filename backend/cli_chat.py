@@ -10,6 +10,7 @@ Optional env vars (loaded from .env automatically):
 """
 
 import asyncio
+import logging
 import os
 import sys
 
@@ -23,6 +24,10 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from assistant.graph import compile_graph, create_assistant_graph
 from assistant.nodes.streaming import cleanup_streaming_queue, get_streaming_queue
+
+# Dev harness: node/service decisions log via module loggers; configure the root
+# logger so those stay visible when running the CLI directly.
+logging.basicConfig(level=logging.INFO)
 
 CLI_CONVERSATION_ID = 0  # int so State validation passes; streaming key becomes "0"
 

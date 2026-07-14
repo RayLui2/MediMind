@@ -8,7 +8,7 @@ class Conversation(BaseModel):
 
     id: Optional[int] = Field(default=None, description="Database record ID")
     user_id: Optional[int] = Field(default=None, description="ID of the user this conversation belongs to")
-    title: Optional[str] = Field(default="New Chat", description="Short descriptive title generated from the first message, e.g. 'Headache questions', 'Medication side effects'")
+    title: Optional[str] = Field(default=None, description="Short descriptive title generated from the first message, e.g. 'Headache questions', 'Medication side effects'")
     instructions: List[str] = Field(default=[], description="Custom behavior instructions set by the user for this conversation, e.g. 'be concise', 'use bullet points'")
     created_at: Optional[datetime] = Field(default=None, description="When this conversation was created")
     updated_at: Optional[datetime] = Field(default=None, description="When this conversation was last updated")

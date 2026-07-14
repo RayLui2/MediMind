@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -6,6 +8,10 @@ from app.database import get_db
 from app.routes.auth import router as auth_router
 from app.routes.chat import router as chat_router
 from app.routes.dashboard import router as dashboard_router
+
+# uvicorn configures only its own loggers, not the root logger, so application
+# module loggers would have no handler and their INFO logs would be invisible.
+logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="MediMind API", version="1.0.0")
 

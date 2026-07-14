@@ -1,19 +1,13 @@
-# Standard library imports
-import os
-
 # Third-party imports
-from dotenv import load_dotenv
-from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage
 from sqlalchemy.orm import Session
 
 # Local
+from assistant.llm import get_llm
 from assistant.state import State
 from assistant.models.health_profile import HealthProfile
 from assistant.models.vital_sign import VitalSign
 from app.models.recommendations import Recommendation, RecommendationsResponse
-
-load_dotenv()
 
 
 def generate_recommendations_prompt(state: State) -> str:
@@ -98,12 +92,7 @@ def create_recommendations_node(db: Session):
         A node function compatible with LangGraph
     """
 
-    llm = init_chat_model(
-        os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-        model_provider="google_genai",
-        api_key=os.getenv("GEMINI_API_KEY"),
-        temperature=0.5,
-    )
+    llm = get_llm(temperature=0.5)
 
     # Add structured output
     structured_llm = llm.with_structured_output(RecommendationsResponse)

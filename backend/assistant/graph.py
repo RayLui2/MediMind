@@ -1,8 +1,4 @@
-# Standard library imports
-import os
-
 # Third-party imports
-from dotenv import load_dotenv
 from langgraph.graph import END, StateGraph
 
 # Local imports
@@ -13,8 +9,6 @@ from assistant.nodes.context_builder import create_context_builder_node
 from assistant.nodes.critic import create_critic_node
 from assistant.nodes.streaming import create_streaming_node
 from assistant.nodes.summarizer import create_summarizer_node
-
-load_dotenv()
 
 
 def create_assistant_graph() -> StateGraph:

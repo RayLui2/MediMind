@@ -1,26 +1,23 @@
 # Standard library
-import os
+import logging
 
 # Third-party
-from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage
 
 # Local
+from assistant.llm import get_llm
 from assistant.state import State
+
+logger = logging.getLogger(__name__)
 
 def create_summarizer_node():
     """Create a node that generates a concise title from the first message"""
 
-    llm = init_chat_model(
-        os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-        model_provider="google_genai",
-        api_key=os.getenv("GEMINI_API_KEY"),
-        temperature=0.3,
-    )
+    llm = get_llm(temperature=0.3)
 
     async def summarizer_node(state: State):
-        # Only summarize if there's no summary yet
-        if state.conversation_title != "New Chat":
+        # Only summarize if there's no title yet (None means "not yet titled")
+        if state.conversation_title:
             return {"conversation_title": state.conversation_title}
 
         # Get the first user message
@@ -32,7 +29,7 @@ def create_summarizer_node():
                 break
 
         if not first_user_msg:
-            return {"conversation_title": "New Chat"}
+            return {"conversation_title": None}
 
         # Create summarization prompt
         prompt = f"""Generate a concise, descriptive title (max 6 words) with an emoji at the end of the title. The title should be a single sentence and should be descriptive of the conversation:
@@ -52,7 +49,7 @@ User's first message: "{first_user_msg}"
         response = await llm.ainvoke([HumanMessage(content=prompt)])
         conversation_title = response.content.strip()
 
-        print(f"Conversation title: {conversation_title}")
+        logger.info(f"Conversation title: {conversation_title}")
         return {"conversation_title": conversation_title}
 
     return summarizer_node

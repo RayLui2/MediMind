@@ -189,6 +189,8 @@ So there are two competing persistence models, each ~50% implemented. The manual
 **Tip**: LangGraph can generate the diagram from the real graph — `graph.get_graph().draw_mermaid()` — so the picture can never lie.
 
 ### 3.10 Smaller issues, briefly
+**Status: ✅ Fixed** — module loggers (`logging.getLogger(__name__)`) replace every `print()`/`traceback.print_exc()`, with `logging.basicConfig(level=INFO)` in `main.py`/`cli_chat.py` so uvicorn's handler-less root logger still surfaces them; a graph failure in `stream_chat` now pushes an `{"type": "error"}` item into the streaming queue so the SSE consumer fails fast instead of waiting out the 60 s `wait_for` timeout; the new `assistant/llm.py:get_llm(temperature=...)` factory removes the duplicated `load_dotenv()`/`init_chat_model(...)` boilerplate across the nodes; the unused `topic_lower` line in `context_builder` is deleted; and `None` (not the `"New Chat"` magic sentinel) now means "not yet titled" end-to-end, with a display fallback in the frontend.
+
 - `print()` debugging in every node instead of `logging` — you can't control verbosity or ship this
 - No error handling in nodes: a Gemini rate-limit anywhere kills the run, and if it dies before the streaming node, the queue never receives `"end"` — the SSE consumer sits the full 60 s timeout (`assistant_service.py:199`) before noticing. Push an error event into the queue from a `try/finally`, or `asyncio.wait` on both the queue and the graph task.
 - `load_dotenv()` + `init_chat_model(...)` boilerplate duplicated across six files — one `get_llm(temperature=...)` factory would remove it all

@@ -28,14 +28,14 @@ class MessageResponse(BaseModel):
 
 class ConversationCreate(BaseModel):
     """Request to create a new conversation"""
-    title: Optional[str] = "New Chat"
+    title: Optional[str] = None
 
 
 class ConversationResponse(BaseModel):
     """Response for a conversation"""
     id: int
     user_id: int
-    title: str
+    title: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     
@@ -47,7 +47,7 @@ class ConversationWithMessages(BaseModel):
     """Conversation with all its messages"""
     id: int
     user_id: int
-    title: str
+    title: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     messages: List[MessageResponse]

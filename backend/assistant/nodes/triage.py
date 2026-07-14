@@ -1,18 +1,17 @@
 # Standard library
-import os
+import logging
 
 # Third-party
-from dotenv import load_dotenv
-from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage
 
 # Local
+from assistant.llm import get_llm
 from assistant.state import State
 from assistant.models.triage import TriageResult
 from assistant.models.health_profile import HealthProfile
 from assistant.models.medications import Medication
 
-load_dotenv()
+logger = logging.getLogger(__name__)
 
 def generate_system_prompt(health_profile: HealthProfile, medications: list[Medication]):
     conditions = health_profile.current_conditions or [] if health_profile else []
@@ -68,13 +67,7 @@ def generate_system_prompt(health_profile: HealthProfile, medications: list[Medi
   advice")."""
 
 def create_triage_node():
-    llm = init_chat_model(
-        os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-        model_provider="google_genai",
-        api_key=os.getenv("GEMINI_API_KEY"),
-        temperature=0.05,
-        streaming=False,
-    )
+    llm = get_llm(temperature=0.05, streaming=False)
 
     structured_llm = llm.with_structured_output(TriageResult)
 
@@ -92,7 +85,7 @@ def create_triage_node():
             HumanMessage(content=original_content)
         ])
 
-        print(f"triage_result: {response}")
+        logger.info(f"triage_result: {response}")
 
         if response.severity == "general" or response.severity == "off_topic":
             return {"triage_result": response, "critic_approved": True}
