@@ -194,10 +194,14 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 # Google Gemini API
 GEMINI_API_KEY=your-gemini-api-key-here
-
-# CORS
-CORS_ORIGINS=http://localhost:3000
+# Optional model overrides (defaults shown). FAST serves the cheap
+# classification/labeling nodes (triage, summarizer); it has its own
+# free-tier quota, separate from the main model's.
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL_FAST=gemini-3.1-flash-lite
 ```
+
+CORS is hardcoded in `backend/app/main.py` (allows `http://localhost:3000`).
 
 ### Running the Application
 

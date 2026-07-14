@@ -54,12 +54,12 @@ That same triage signal decides the **delivery mode** for the turn. The graph co
 Pass-through entry point. Resets `critic_approved` and `revision_count` so each new message starts a fresh critic loop.
 
 ### `summarizer` *(parallel branch)*
-Runs in parallel with `triage`. Generates a short conversation title (≤ 6 words + emoji) from the user's first message using Gemini. Skips if the conversation already has a title.
+Runs in parallel with `triage`. Generates a short conversation title (≤ 6 words + emoji) from the user's first message. Runs on the fast model tier (`GEMINI_MODEL_FAST`) — cheap labeling task. Skips if the conversation already has a title.
 
 **Output:** `conversation_title`
 
 ### `triage` *(parallel branch)*
-Classifies the urgency and topic of the user's message. Uses the user's health profile (conditions, medications, allergies) to escalate severity when relevant.
+Classifies the urgency and topic of the user's message. Uses the user's health profile (conditions, medications, allergies) to escalate severity when relevant. Runs on the fast model tier (`GEMINI_MODEL_FAST`), validated by `evals/run_triage_eval.py` — 97% accuracy, 7/7 emergency recall on the 30-case set (2026-07-14); re-run the eval before changing this node's model or prompt.
 
 **Severity levels:**
 | Level | Meaning |

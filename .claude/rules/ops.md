@@ -64,7 +64,6 @@ AI-layer-only iteration (no web stack, no DB): `cd backend && python cli_chat.py
 * Update docs in the same change that invalidates them — doc drift is this repo's documented weakness
 * Known existing drift (fix when touching the area, don't silently work around it):
   * README documents `POST /chat/messages`; the real endpoint is `POST /chat/stream`
-  * README documents `CORS_ORIGINS` env var; CORS is actually hardcoded in `app/main.py`
 
 ---
 

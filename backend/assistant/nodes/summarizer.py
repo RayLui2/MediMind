@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 def create_summarizer_node():
     """Create a node that generates a concise title from the first message"""
 
-    llm = get_llm(temperature=0.3)
+    llm = get_llm(temperature=0.3, tier="fast")
 
     async def summarizer_node(state: State):
         # Only summarize if there's no title yet (None means "not yet titled")

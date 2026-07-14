@@ -67,7 +67,7 @@ def generate_system_prompt(health_profile: HealthProfile, medications: list[Medi
   advice")."""
 
 def create_triage_node():
-    llm = get_llm(temperature=0.05, streaming=False)
+    llm = get_llm(temperature=0.05, streaming=False, tier="fast")
 
     structured_llm = llm.with_structured_output(TriageResult)
 
