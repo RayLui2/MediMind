@@ -23,13 +23,12 @@ load_dotenv()
 from langchain_core.messages import AIMessage, HumanMessage
 
 from assistant.graph import compile_graph, create_assistant_graph
-from assistant.nodes.streaming import cleanup_streaming_queue, get_streaming_queue
 
 # Dev harness: node/service decisions log via module loggers; configure the root
 # logger so those stay visible when running the CLI directly.
 logging.basicConfig(level=logging.INFO)
 
-CLI_CONVERSATION_ID = 0  # int so State validation passes; streaming key becomes "0"
+CLI_CONVERSATION_ID = 0  # int so State validation passes
 
 
 async def chat() -> None:
@@ -59,43 +58,41 @@ async def chat() -> None:
             "conversation_id": CLI_CONVERSATION_ID,
         }
 
-        # Set up streaming queue before launching graph
-        queue = get_streaming_queue(str(CLI_CONVERSATION_ID))
-
         print("Assistant: ", end="", flush=True)
 
+        # Same delivery policy as AssistantService.stream_chat: print tokens
+        # live only when triage bypassed the critic (general/off_topic);
+        # otherwise print the whole approved answer once the commit node runs.
+        live = False
         full_response = ""
 
-        async def run_graph() -> None:
-            await graph.ainvoke(state_dict)
+        async for event in graph.astream_events(state_dict, version="v2"):
+            kind = event.get("event")
+            name = event.get("name", "")
+            node = event.get("metadata", {}).get("langgraph_node", "")
 
-        graph_task = asyncio.create_task(run_graph())
+            if kind == "on_chain_end" and name == "triage":
+                output = event.get("data", {}).get("output") or {}
+                if isinstance(output, dict):
+                    live = bool(output.get("critic_approved"))
 
-        # Consume tokens from queue as the streaming node emits them
-        done = False
-        while not done:
-            try:
-                item = await asyncio.wait_for(queue.get(), timeout=120.0)
-                if item["type"] == "token":
-                    print(item["text"], end="", flush=True)
-                    full_response += item["text"]
-                elif item["type"] == "end":
-                    done = True
-            except asyncio.TimeoutError:
-                if graph_task.done():
-                    done = True
-                else:
-                    print("\n[timeout waiting for response]")
-                    graph_task.cancel()
-                    break
+            elif kind == "on_chat_model_stream" and node == "chatbot" and live:
+                chunk = event.get("data", {}).get("chunk")
+                if chunk is not None and isinstance(chunk.content, str) and chunk.content:
+                    print(chunk.content, end="", flush=True)
 
-        await graph_task
-        cleanup_streaming_queue(str(CLI_CONVERSATION_ID))
+            elif kind == "on_chain_end" and name == "streaming":
+                output = event.get("data", {}).get("output") or {}
+                msgs = output.get("messages") if isinstance(output, dict) else None
+                if msgs:
+                    full_response = msgs[-1].content
+                    if not live:
+                        print(full_response, end="", flush=True)
 
-        print()  # newline after streamed response
+        print()  # newline after the response
 
         if full_response:
-            messages.append(AIMessage(content=full_response.strip()))
+            messages.append(AIMessage(content=full_response))
 
 
 if __name__ == "__main__":

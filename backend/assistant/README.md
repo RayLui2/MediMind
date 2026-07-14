@@ -44,6 +44,8 @@ The AI assistant is built with [LangGraph](https://github.com/langchain-ai/langg
 
 `chatbot → critic` is a conditional edge: if `critic_approved` is already `True` (set by `triage` for `general`/`off_topic` messages), the graph routes straight to `streaming`, skipping the critic LLM call entirely. Otherwise it goes to `critic` as normal, which can loop back to `chatbot` up to 2 times before auto-approving.
 
+That same triage signal decides the **delivery mode** for the turn. The graph contains no transport — the caller (`AssistantService.stream_chat` or `cli_chat.py`) consumes `graph.astream_events(...)` and applies the policy: for `general`/`off_topic` turns (critic bypassed, nothing can veto the text) the chatbot's tokens are forwarded live as they generate; for `clinical`/`emergency` turns the critic must see the complete text before the user does, so the answer is delivered as one whole chunk after the `streaming` (commit) node runs.
+
 ---
 
 ## Nodes
@@ -100,7 +102,7 @@ If the draft fails, it returns a one-sentence critique and the chatbot revises. 
 **Output:** `critic_approved`, `critique`, `revision_count`
 
 ### `streaming`
-Emits the approved `draft_response` token by token into an `asyncio.Queue` keyed by `conversation_id`. The API layer (SSE) or CLI consumes this queue and sends tokens to the client in real time.
+The commit node — the single writer of the assistant message per turn. Appends the approved `draft_response` to `messages` as the final `AIMessage`. Despite the name it does no transport: delivery (live tokens vs one whole chunk) is decided by the caller watching `astream_events`, and the canonical text callers persist is this node's output, not re-assembled wire chunks.
 
 **Output:** appends final `AIMessage` to `messages`
 
@@ -142,7 +144,7 @@ assistant/
 │   ├── context_builder.py# Retrieves relevant health context
 │   ├── chatbot.py        # Main response generator
 │   ├── critic.py         # Safety reviewer
-│   ├── streaming.py      # Token streaming via asyncio.Queue
+│   ├── streaming.py      # Commit node — appends the final AIMessage
 │   ├── summarizer.py     # Conversation title generator
 │   └── recommendations.py# Recommendations node (used by graphs/recommendations.py)
 ├── models/
@@ -171,4 +173,4 @@ cd backend
 python cli_chat.py
 ```
 
-Runs the full graph pipeline interactively. Streams tokens to the terminal as the streaming node emits them. No database required — conversation history is kept in memory for the session.
+Runs the full graph pipeline interactively with the same delivery policy as the API: `general`/`off_topic` answers stream token by token, `clinical`/`emergency` answers print whole after critic approval. No database required — conversation history is kept in memory for the session.

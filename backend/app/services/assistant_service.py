@@ -1,5 +1,4 @@
 # Standard library
-import asyncio
 import logging
 from typing import AsyncGenerator, Dict, Any, List, Optional
 
@@ -10,7 +9,6 @@ from sqlalchemy.orm import Session
 # Local
 from assistant.state import State
 from assistant.graph import assistant_graph
-from assistant.nodes.streaming import get_streaming_queue, cleanup_streaming_queue
 from app.models.conversations import Conversation
 from app.models.message import Message
 from app.models.medication import Medication
@@ -128,20 +126,22 @@ class AssistantService:
         conversation: Conversation
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
-        Stream chat response tokens using LangGraph's astream_events.
+        Stream the chat response by consuming the graph's astream_events run.
 
-        This method:
-        1. Initializes State with user data and conversation context
-        2. Invokes the LangGraph with astream_events for token-level streaming
-        3. Captures streaming tokens from the chatbot node's LLM calls
-        4. Also captures the conversation title from the summarizer node
+        Delivery policy: triage's critic_approved flag — set only for
+        general/off_topic, where the critic is bypassed — decides the mode for
+        the turn. Live mode forwards the chatbot's tokens as they are generated;
+        buffered mode (clinical/emergency, critic in the loop) sends the whole
+        approved answer as a single chunk after the commit ("streaming") node
+        runs. Nothing goes on the wire that the critic could still veto.
 
         Args:
             user_message: The user's message content
             conversation: The conversation object
 
         Yields:
-            Dict events: chunk (tokens), title (from summarizer), or complete
+            Dict events: chunk (token or whole message), title (from summarizer),
+            error, then complete (carrying the canonical full_response)
         """
         # Initialize state with conversation context and health data
         state = self._initialize_state(conversation, user_message, include_health_data=True)
@@ -159,80 +159,53 @@ class AssistantService:
             "medications": [m.model_dump() for m in state.medications] if state.medications else None,
         }
 
-        full_response = ""
+        live = False          # decided the moment triage finishes
+        full_response = ""    # canonical text comes from the commit node, not the wire
         new_title = None
-        conversation_id = str(conversation.id)
-
-        # Get the streaming queue for this conversation
-        queue = get_streaming_queue(conversation_id)
 
         try:
-            # Create a task to run the graph in the background
-            async def run_graph():
-                nonlocal new_title
-                try:
-                    async for event in self._graph.astream_events(state_dict, version="v2"):
-                        event_type = event.get("event")
-                        event_name = event.get("name", "")
+            async for event in self._graph.astream_events(state_dict, version="v2"):
+                kind = event.get("event")
+                name = event.get("name", "")
+                node = event.get("metadata", {}).get("langgraph_node", "")
 
-                        # Capture the conversation title from summarizer node output
-                        if event_type == "on_chain_end" and "summarizer" in event_name.lower():
-                            output = event.get("data", {}).get("output", {})
-                            if isinstance(output, dict) and output.get("conversation_title"):
-                                title = output["conversation_title"]
-                                if title:
-                                    new_title = title
-                                    await queue.put({"type": "title", "title": new_title})
-                except Exception as e:
-                    # If the graph dies before the streaming node emits "end", the queue would
-                    # never unblock and the consumer would sit the full 60s wait_for timeout.
-                    # Push an error item so the consumer fails fast. Do NOT re-raise: the
-                    # consumer handles this item, and `await graph_task` below would otherwise
-                    # surface the same exception a second time.
-                    logger.exception("Graph execution failed during stream_chat")
-                    await queue.put({"type": "error", "message": str(e)})
+                # Triage decides the delivery mode for this turn:
+                # critic_approved=True is only set for general/off_topic.
+                if kind == "on_chain_end" and name == "triage":
+                    output = event.get("data", {}).get("output") or {}
+                    if isinstance(output, dict):
+                        live = bool(output.get("critic_approved"))
 
-            # Start the graph execution in background
-            graph_task = asyncio.create_task(run_graph())
+                # Live path: forward chatbot tokens as they are generated.
+                # The langgraph_node filter keeps triage/critic/summarizer
+                # function-call fragments out of the user's chat window.
+                elif kind == "on_chat_model_stream" and node == "chatbot" and live:
+                    chunk = event.get("data", {}).get("chunk")
+                    if chunk is not None and isinstance(chunk.content, str) and chunk.content:
+                        yield {"type": "chunk", "text": chunk.content}
 
-            # Read streaming tokens from the queue
-            streaming_done = False
-            while not streaming_done:
-                try:
-                    # Wait for tokens with a timeout
-                    item = await asyncio.wait_for(queue.get(), timeout=60.0)
+                # Conversation title from the summarizer (runs in parallel).
+                elif kind == "on_chain_end" and name == "summarizer":
+                    output = event.get("data", {}).get("output") or {}
+                    if isinstance(output, dict) and output.get("conversation_title"):
+                        new_title = output["conversation_title"]
+                        yield {"type": "title", "title": new_title}
 
-                    if item["type"] == "token":
-                        token = item["text"]
-                        full_response += token
-                        yield {"type": "chunk", "text": token}
-                        await asyncio.sleep(0)
-                    elif item["type"] == "title":
-                        yield {"type": "title", "title": item["title"]}
-                    elif item["type"] == "error":
-                        yield {"type": "error", "message": item["message"]}
-                        return
-                    elif item["type"] == "end":
-                        streaming_done = True
-
-                except asyncio.TimeoutError:
-                    # Timeout waiting for tokens, check if graph is done
-                    if graph_task.done():
-                        streaming_done = True
-                    else:
-                        yield {"type": "error", "message": "Streaming timeout"}
-                        return
-
-            # Wait for the graph task to complete
-            await graph_task
+                # Commit node finished: the one true final text.
+                # Buffered path: the whole answer goes out here, as one chunk.
+                # Live path: tokens already went out; just record the canonical text.
+                elif kind == "on_chain_end" and name == "streaming":
+                    output = event.get("data", {}).get("output") or {}
+                    msgs = output.get("messages") if isinstance(output, dict) else None
+                    if msgs:
+                        full_response = msgs[-1].content
+                        if not live:
+                            yield {"type": "chunk", "text": full_response}
 
         except Exception as e:
             logger.exception("stream_chat failed")
             yield {"type": "error", "message": str(e)}
             return
-        finally:
-            # Clean up the streaming queue
-            cleanup_streaming_queue(conversation_id)
 
         # Return the complete response and any title update
         yield {

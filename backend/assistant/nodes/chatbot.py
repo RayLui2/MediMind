@@ -1,15 +1,10 @@
 # Third-party
-from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage
 
 # Local
 from assistant.llm import get_llm
 from assistant.prompts.chatbot_prompt import chatbot_prompt
 from assistant.state import State
-
-
-class llmResponseStructure(BaseModel):
-    content: str = Field(description="The full text content of the message")
 
 
 def generate_system_prompt(state: State) -> str:
@@ -42,14 +37,15 @@ def generate_system_prompt(state: State) -> str:
 
 
 def create_chatbot_node():
+    # streaming=True surfaces the tokens as on_chat_model_stream events to any
+    # astream_events consumer; whether they reach the user is the service
+    # layer's decision, not this node's.
     llm = get_llm(temperature=0.2, streaming=True)
-
-    structured_llm = llm.with_structured_output(llmResponseStructure)
 
     async def chatbot_node(state: State):
         messages = [SystemMessage(content=generate_system_prompt(state))] + list(state.messages)
 
-        response = await structured_llm.ainvoke(messages)
+        response = await llm.ainvoke(messages)
 
         return {
             "draft_response": response.content
