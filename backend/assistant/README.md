@@ -42,7 +42,7 @@ The AI assistant is built with [LangGraph](https://github.com/langchain-ai/langg
 
 `fanout` kicks off `summarizer` and `triage` in **parallel**. Each branch ends at `END` independently — LangGraph merges state when both branches complete.
 
-`chatbot → critic` is a conditional edge: if `critic_approved` is already `True` (set by `triage` for `general`/`off_topic` messages), the graph routes straight to `streaming`, skipping the critic LLM call entirely. Otherwise it goes to `critic` as normal, which can loop back to `chatbot` up to 2 times before auto-approving.
+`chatbot → critic` is a conditional edge: if `critic_approved` is already `True` (set by `triage` for `general`/`off_topic` messages), the graph routes straight to `streaming`, skipping the critic LLM call entirely. Otherwise it goes to `critic` as normal, which can loop back to `chatbot` up to 2 times before auto-approving (on `emergency` turns a still-unapproved draft is replaced by a 911-first fallback template instead — see the `critic` node below).
 
 That same triage signal decides the **delivery mode** for the turn. The graph contains no transport — the caller (`AssistantService.stream_chat` or `cli_chat.py`) consumes `graph.astream_events(...)` and applies the policy: for `general`/`off_topic` turns (critic bypassed, nothing can veto the text) the chatbot's tokens are forwarded live as they generate; for `clinical`/`emergency` turns the critic must see the complete text before the user does, so the answer is delivered as one whole chunk after the `streaming` (commit) node runs.
 
@@ -71,6 +71,8 @@ Classifies the urgency and topic of the user's message. Uses the user's health p
 
 For `general` and `off_topic` messages, `critic_approved` is set to `True` immediately (skips the critic loop).
 
+**Failure policy (fail toward safety):** if the triage LLM call errors, the node returns `severity: clinical` (topic `"unclassified (triage error)"`) — never `general` — so the critic stays in the loop and the chatbot recommends professional evaluation.
+
 **Output:** `triage_result`, optionally `critic_approved: True`
 
 ### `context_builder`
@@ -97,7 +99,9 @@ Safety reviewer. Skipped entirely when `triage` already set `critic_approved: Tr
 3. Emergency escalation — does it lead with 911/ER guidance when needed?
 4. Completeness — does it actually answer the question?
 
-If the draft fails, it returns a one-sentence critique and the chatbot revises. Max **2 revision** (then auto-approved).
+If the draft fails, it returns a one-sentence critique and the chatbot revises. Max **2 revisions** (then auto-approved — except on `emergency` turns, see below).
+
+**Failure policy (fail toward safety):** on `emergency` turns, a draft the critic never approved must not reach the user. If the critic LLM call errors, or a rejection hits the revision cap, the node replaces `draft_response` with a fixed fallback template that leads with the 911/ER instruction (`EMERGENCY_FALLBACK_RESPONSE` in `nodes/critic.py`). For `clinical` severity, a critic error ships the draft unreviewed (it was generated with the severity-aware prompt) rather than looping against a broken critic.
 
 Measured by `evals/run_critic_eval.py`: 24 labeled (message, draft) pairs — 12 unsafe drafts with planted flaws it must reject (missing 911 lead, contraindicated med suggestions, misinformation), 12 clean drafts it must approve (including false-positive traps). Iteration pass on `gemini-3.1-flash-lite`: 24/24 (2026-07-14); production-model (flash) baseline pending. Re-run before changing this node's prompt or strictness levels.
 

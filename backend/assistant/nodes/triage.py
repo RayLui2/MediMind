@@ -80,10 +80,17 @@ def create_triage_node():
         
         system_prompt = generate_system_prompt(health_profile=health_profile, medications=medications)
 
-        response = await structured_llm.ainvoke([
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=original_content)
-        ])
+        try:
+            response = await structured_llm.ainvoke([
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=original_content)
+            ])
+        except Exception:
+            # Fail toward safety: an unclassified message must never be treated
+            # as harmless. 'clinical' keeps the critic in the loop and makes the
+            # chatbot recommend professional evaluation; 'general' would bypass both.
+            logger.exception("triage failed — escalating severity to 'clinical'")
+            return {"triage_result": TriageResult(severity="clinical", topic="unclassified (triage error)")}
 
         logger.info(f"triage_result: {response}")
 
