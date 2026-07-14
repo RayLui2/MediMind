@@ -8,7 +8,7 @@ A learning-focused review of the LangGraph assistant in `backend/assistant/`, wr
 
 **For a first LangGraph project, this is well above average.** Most first projects are a single prompt wrapped in one node. You built a multi-node graph with parallel branches, conditional routing, a self-correction loop, structured outputs, and a clean service layer — those are real agent-architecture patterns, applied in a domain (health) where they actually make sense.
 
-The weaknesses are the classic first-project ones: a key optimization that silently never runs, "streaming" that is simulated rather than real, framework features (checkpointer) adopted halfway, transport concerns leaking into graph nodes, several crash paths on missing data, and no way to measure whether the AI components actually work (no evals, no tracing).
+The weaknesses were the classic first-project ones: a key optimization that silently never ran, "streaming" that was simulated rather than real, framework features (checkpointer) adopted halfway, transport concerns leaking into graph nodes, several crash paths on missing data, and no way to measure whether the AI components actually worked. Most of that list is now fixed (see §3 status markers) — real token streaming shipped, model routing landed, and a triage eval exists. What's left is a real safety gap (failure doesn't escalate — §4.4), no tracing (§4.6), a handful of dead files (§3.8), a pending critic-eval baseline (§4.5), and a real test suite (§4.8).
 
 None of that diminishes the learning value — in fact, the bugs here are *exactly* the bugs that teach you the most about how LangGraph and LLM systems behave.
 
@@ -103,7 +103,9 @@ Result: the flag triage sets is dead — every message pays the full critic LLM 
 **Lesson**: in graph frameworks, control flow lives in the edges. A state flag no edge or node reads is a no-op, and nothing warns you.
 
 ### 3.2 Streaming is simulated, and it destroys your markdown
-Two compounding issues:
+**Status: ✅ Fixed** — `llmResponseStructure` is gone; `chatbot_node` (`chatbot.py`) now calls the plain LLM with `streaming=True` and returns raw `response.content` as `draft_response`. `assistant_service.stream_chat` consumes `astream_events` directly: for `general`/`off_topic` turns (where triage already set `critic_approved`, §3.1) it forwards the chatbot's real tokens live, filtered to `langgraph_node == "chatbot"`; for `clinical`/`emergency` turns it buffers and sends the critic-approved text as one chunk once the `streaming` commit node finishes. No `.split()`/rejoin, no markdown mangling — this is §4.1's "gate by severity" option, implemented.
+
+Two compounding issues (historical — both resolved above):
 
 1. `chatbot.py:60` wraps the response in `with_structured_output(llmResponseStructure)` — a Pydantic model whose only field is `content: str`. Structured output works via function-calling, which means **no plain text tokens ever stream from the LLM**. The `streaming=True` flag on the model (`chatbot.py:57`) buys you nothing. The whole response must complete before anything moves.
 2. The streaming node then fakes it: `draft_response.split()` and re-joining with single spaces (`streaming.py:42-43`). `.split()` swallows **all newlines**. Your chatbot prompt explicitly demands markdown with blank lines between sections and numbered lists (`prompts/chatbot_prompt.py`) — and then the streaming node flattens every response to one long line. Because the API layer rebuilds `full_response` from these mangled chunks (`assistant_service.py:201-204`) and saves that to the DB (`chat.py:167-171`), the **stored** message loses its formatting too.
@@ -171,13 +173,12 @@ So there are two competing persistence models, each ~50% implemented. The manual
 **Fix**: pick one. For this app I'd keep DB-as-source-of-truth (your messages table already drives the UI) and delete the checkpointer support, `thread_id` config, and the unused dependency. If you want to *learn* checkpointing, do it deliberately: compile with `PostgresSaver`, make `thread_id` the conversation id, stop re-loading history manually — and fix §3.5 first, or the checkpointer will faithfully persist your duplicated drafts.
 
 ### 3.8 Dead and broken auxiliary code
-**Status: 🔶 Partially resolved** — `state.chat_history`, its reducer, and the `ChatMessage` model (`models/chat.py`) are deleted; nothing read them. Still remaining: `safety.py`, `tools/update_instructions.py`, `get_rxcui_by_string`.
+**Status: 🔶 Partially resolved** — `state.chat_history`, its reducer, and the `ChatMessage` model (`models/chat.py`) are deleted; nothing read them. Still remaining: `safety.py`, `tools/update_instructions.py`, `get_rxcui_by_string`, and a newly-identified straggler from the §3.7 checkpointer cleanup.
 
 - `nodes/safety.py` — an empty file containing one comment
 - `tools/update_instructions.py` — never imported anywhere; would crash if called (`response.instructions` doesn't exist on an `AIMessage`, declared return type `Command` doesn't match, `args_schema` says `dict` while the parameter says `List[str]`)
-- `state.chat_history` — written by two nodes, read by nothing; duplicates `messages`
-- `chat_history_reducer` in `state.py:13` — defined, then an equivalent lambda is used instead (`state.py:33`)
-- `get_rxcui_by_string` — called only from commented-out code
+- `get_rxcui_by_string` (`context_builder.py:12`) — called only from a commented-out line (`context_builder.py:48`)
+- `backend/tests/test_assistant_with_checkpoint.py` — orphaned by the §3.7 checkpointer removal: it builds state with a `chat_history` key that no longer exists on `State` (deleted in that same cleanup pass) and passes a `thread_id` config that's been inert since the checkpointer plumbing was removed, so it no longer tests what its name says. It's also not `pytest`-discoverable (`pytest` isn't installed, §4.8) and would make real Gemini calls if run — delete it, or fold an assertion-bearing version into the §4.8 test rebuild.
 
 **Lesson**: exploration code is healthy; *shipping* it isn't. Delete scaffolding once the direction is chosen — in AI projects especially, dead prompts/tools/state fields actively mislead the next reader (including future you) about what the system does.
 
@@ -202,16 +203,18 @@ So there are two competing persistence models, each ~50% implemented. The manual
 ## 4. Design-Level Improvements (ranked by learning value)
 
 ### 4.1 Resolve the streaming ↔ critic tension deliberately
-This is the most interesting architectural problem in your project, so treat it as a feature of the learning experience. You cannot both (a) stream tokens live to the user and (b) have a critic veto the response after generation — once tokens are on the wire, there's nothing to veto. Real systems pick one of:
+**Status: ✅ Done** — option 1 (gate by severity) is implemented. `assistant_service.stream_chat` reads `critic_approved` off the `triage` node's output the moment it finishes: `general`/`off_topic` turns forward the chatbot's real tokens live via `astream_events`; `clinical`/`emergency` turns stay buffered until the critic-approved draft is committed by the `streaming` node, then go out as one chunk. Nothing reaches the wire that the critic could still veto.
 
-1. **Gate by severity** *(recommended for you)*: `general`/`off_topic` messages stream directly from the chatbot LLM (real tokens, real latency win — this is what §3.1 was trying to be); `clinical`/`emergency` messages go through the critic and are delivered after approval. Emergencies are short responses anyway; the buffering cost is low exactly where the safety value is high.
-2. **Stream the draft, verify after**: show the response immediately, run the critic in parallel, and visibly correct/retract if it fails. Good UX, complex UI.
-3. **Buffer everything** (your current design): simplest, safest, slowest. If you keep it, at least fix the fake word-splitting (§3.2) — send the response in a few chunks or all at once honestly.
+This was the most interesting architectural problem in the project. You cannot both (a) stream tokens live to the user and (b) have a critic veto the response after generation — once tokens are on the wire, there's nothing to veto. Real systems pick one of:
 
-The fact that your architecture *forces* this choice is a sign it's a real architecture.
+1. **Gate by severity** *(implemented)*: `general`/`off_topic` messages stream directly from the chatbot LLM (real tokens, real latency win); `clinical`/`emergency` messages go through the critic and are delivered after approval. Emergencies are short responses anyway; the buffering cost is low exactly where the safety value is high.
+2. **Stream the draft, verify after**: show the response immediately, run the critic in parallel, and visibly correct/retract if it fails. Good UX, complex UI — not pursued here.
+3. **Buffer everything**: simplest, safest, slowest — the design before this fix.
 
 ### 4.2 Get transport out of the graph
-The global `_streaming_queues` dict (`streaming.py:14`) makes a graph node aware of your delivery mechanism. Concretely it: breaks under `uvicorn --workers 2+` (each process has its own dict), races if one conversation gets two concurrent messages (both runs share a queue), and leaks queues when a consumer dies before `cleanup`. LangGraph's `astream_events` / `stream_mode` APIs exist precisely so the *caller* observes the run without nodes knowing who's listening. A graph should be a pure(ish) function of state → state; the service layer owns SSE.
+**Status: ✅ Done** — the global `_streaming_queues` dict is gone. `streaming.py` is now a pure commit node: it only appends the approved `draft_response` to `messages` and returns, with no knowledge of SSE, queues, or who's listening. `assistant_service.stream_chat` owns delivery entirely by watching `astream_events` from the caller side (§4.1), so the graph is a function of state → state and survives multiple `uvicorn` workers without shared in-process state.
+
+The old design: a global `_streaming_queues` dict (`streaming.py:14`) made a graph node aware of the delivery mechanism — it broke under `uvicorn --workers 2+` (each process had its own dict), raced if one conversation got two concurrent messages (both runs shared a queue), and leaked queues when a consumer died before `cleanup`.
 
 ### 4.3 Route models by task
 **Status: ✅ Done** — `get_llm(tier="fast")` routes `triage` and `summarizer` to `GEMINI_MODEL_FAST` (default `gemini-3.1-flash-lite`); chatbot/critic/recommendations stay on the standard tier. Validated first via the §4.5 triage eval (97% accuracy, 7/7 emergency recall, 0 over-escalations, 2026-07-14). Bonus discovered en route: free-tier quotas are per model (flash: 5 req/min, 20 req/day observed), so the split also roughly doubles usable capacity.
@@ -221,7 +224,7 @@ Every node uses the same Gemini 2.5 Flash. Triage and title generation are cheap
 For most apps error handling means "don't crash." In a triage system it means **fail toward safety**: if the triage LLM call errors or returns garbage, default the severity to `clinical` (escalate), never `general`. If the critic errors on an `emergency` message, don't auto-approve. Right now `revision_count >= 2` auto-approves even emergency drafts the critic rejected twice — consider a fallback template response for that case ("I'm having trouble right now — if this is an emergency, call 911") rather than shipping a twice-rejected draft. Designing the *failure policy* per node is what makes an AI system trustworthy.
 
 ### 4.5 Build an eval before touching another prompt
-**Status: 🔶 Partially done** — triage eval exists: `backend/evals/` (30 labeled cases incl. profile-escalation pairs and adversarial traps; runner reports accuracy, emergency recall, over-escalation, confusion table; gates on 100% recall). Baseline on `gemini-3.1-flash-lite`: 97% accuracy, 7/7 emergency recall (2026-07-14). Still open: the critic eval, and growing the set toward ~50-60 cases.
+**Status: ✅ Done** — both evals exist in `backend/evals/`. **Triage**: 52 labeled cases (grown from 30 on 2026-07-14) incl. profile-escalation pairs and adversarial traps; runner reports accuracy, emergency recall, over-escalation, confusion table; gates on 100% recall. Fully baselined on `gemini-3.1-flash-lite` (2026-07-14, run in two chunks): 51/52 accuracy (98%), 12/12 emergency recall, 0 over-escalations. **Critic**: 24 labeled (message, draft) pairs — 12 unsafe drafts with planted flaws (missing 911 lead, contraindications vs. profile, dangerous dosing, misinformation, completeness failures), 12 clean drafts incl. false-positive traps; `run_critic_eval.py` runs the real critic node with context built by the real `context_builder`, gates on 100% rejection recall and ≥80% clean-approval (false rejections = wasted revision loops). Iteration pass on `gemini-3.1-flash-lite`: 24/24 — 12/12 unsafe drafts rejected (each critique names the planted flaw), 12/12 clean drafts approved incl. both false-positive traps (2026-07-14). Still pending: the baseline on the production model — the critic runs on the standard tier (flash: 20 req/day), so that run needs two daily chunks (`--limit 18` / `--start 19`).
 You have two LLM classifiers (triage, critic) and no way to know if they work. This is the single highest-leverage next step:
 
 - Write ~50 labeled messages (`"crushing chest pain"` → `emergency`, `"what's a good breakfast"` → `general`, ambiguous ones too — with and without relevant conditions in the profile, since profile-aware escalation is your headline feature)
@@ -252,9 +255,10 @@ Today it formats data already in state. The design *wants* to be retrieval: use 
 | Safety design | None | Triage + severity-aware prompting + critic loop |
 | Serving | `invoke()` in a route handler | Service layer, SSE, background task + queue |
 | Dev tooling | Notebook | CLI harness, README with diagram |
-| Weak spots | Everything | Dead code, no evals, simulated streaming, unguarded optionals |
+| Weak spots (original) | Everything | Dead code, no evals, simulated streaming, unguarded optionals |
+| Weak spots (current) | — | A few dead files (§3.8), no fail-toward-safety on triage/critic errors (§4.4), no tracing (§4.6), critic eval baseline pending + broader test suite still open (§4.5, §4.8) |
 
-What it demonstrates to a reader of your resume: you can decompose an AI product into specialized LLM roles, wire non-trivial control flow, and think about safety in a regulated-ish domain. What would elevate it from "promising" to "impressive": a committed eval suite with numbers in the README ("triage: 94% severity accuracy, 100% emergency recall on 60-case eval set"), real token streaming, and tracing screenshots. Those three are what separate "I used LangGraph" from "I engineer LLM systems."
+What it demonstrates to a reader of your resume: you can decompose an AI product into specialized LLM roles, wire non-trivial control flow, and think about safety in a regulated-ish domain. Real token streaming shipped (§3.2/§4.1) and a triage eval with numbers exists (§4.5: 98% accuracy, 12/12 emergency recall on the 52-case set, `gemini-3.1-flash-lite`). What's left to go from "promising" to "impressive": tracing screenshots (§4.6), baseline numbers for the critic eval built in §4.5, and closing the fail-toward-safety gap (§4.4) — that last one is the one that actually matters for a *safety* story, not just a resume line.
 
 ---
 
@@ -280,16 +284,23 @@ The generalized versions of everything above — these apply to any AI system yo
 
 ## 7. Suggested Order of Work
 
-If you want to level this project up, this order maximizes learning per hour:
+Original plan, for reference — everything is done except item 4 (dead code):
 
-1. **Fix the critic skip** with a conditional edge after `chatbot` (§3.1) — 30 minutes, teaches conditional routing properly
-2. **Fix `context_builder`** (`None` guards, the lost vitals/user-info, the type annotation) and unit-test it (§3.3, §3.4)
-3. **Real streaming**: drop `llmResponseStructure`, stream general/off_topic responses directly via `astream_events`, keep critic-gating for clinical/emergency (§3.2, §4.1) — the biggest single upgrade
-4. **Delete the dead code** (checkpointer plumbing or commit to it, `chat_history`, `safety.py`, the unused tool) (§3.7, §3.8)
-5. **Build the triage eval set** and put the numbers in your README (§4.5) — the resume line
-6. **Add LangSmith tracing** (§4.6)
-7. **Model routing** for triage/summarizer (§4.3)
-8. **Topic-driven retrieval** in context_builder — finish the RxNorm idea (§4.7)
+1. ~~Fix the critic skip with a conditional edge after `chatbot` (§3.1)~~ — done
+2. ~~Fix `context_builder` (`None` guards, lost vitals/user-info, the type annotation) and unit-test it (§3.3, §3.4)~~ — done (unit tests for it are still covered by the broader §4.8 gap)
+3. ~~Real streaming: drop `llmResponseStructure`, stream general/off_topic responses directly via `astream_events`, keep critic-gating for clinical/emergency (§3.2, §4.1)~~ — done
+4. **Delete the dead code** — `safety.py`, `tools/update_instructions.py`, `get_rxcui_by_string`, and the now-orphaned `test_assistant_with_checkpoint.py` (§3.8)
+5. ~~Model routing for triage/summarizer (§4.3)~~ — done
+6. ~~Grow the eval set and add a critic eval (§4.5)~~ — done 2026-07-14 (triage grown to 52 cases, 24-case critic eval built; baseline runs still pending, see below)
+
+### What's actually left, in priority order
+
+1. **Fail-toward-safety (§4.4)** — the one open item with real safety weight: `triage_node` has no try/except (an error propagates uncaught instead of escalating to `clinical`), and `critic.py:46-47` auto-approves unconditionally at `revision_count >= 2`, including for `emergency` drafts the critic rejected twice.
+2. **Delete the dead code (§3.8)** — quick, low-risk cleanup: `safety.py`, `tools/update_instructions.py`, `get_rxcui_by_string`, `test_assistant_with_checkpoint.py`.
+3. **Run the critic eval baseline on the production model (§4.5)** — no code, just quota-gated runs of `run_critic_eval.py` on flash, chunked across two days (`--limit 18` / `--start 19`). The flash-lite iteration pass is already perfect (24/24, 2026-07-14), so this is confirmation on the model the critic actually uses. (Triage is fully baselined: 51/52, 12/12 emergency recall.)
+4. **Add tracing (§4.6)** — LangSmith/Langfuse, one env var's worth of setup.
+5. **Real test suite (§4.8)** — add `pytest` to `requirements.txt`, replace the print-and-eyeball scripts in `backend/tests/` with unit + mocked-LLM tests.
+6. **Topic-driven retrieval in `context_builder` (§4.7)** — lowest priority; a design upgrade, not a bug.
 
 ---
 

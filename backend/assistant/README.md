@@ -59,7 +59,7 @@ Runs in parallel with `triage`. Generates a short conversation title (≤ 6 word
 **Output:** `conversation_title`
 
 ### `triage` *(parallel branch)*
-Classifies the urgency and topic of the user's message. Uses the user's health profile (conditions, medications, allergies) to escalate severity when relevant. Runs on the fast model tier (`GEMINI_MODEL_FAST`), validated by `evals/run_triage_eval.py` — 97% accuracy, 7/7 emergency recall on the 30-case set (2026-07-14); re-run the eval before changing this node's model or prompt.
+Classifies the urgency and topic of the user's message. Uses the user's health profile (conditions, medications, allergies) to escalate severity when relevant. Runs on the fast model tier (`GEMINI_MODEL_FAST`), validated by `evals/run_triage_eval.py` — 98% accuracy (51/52), 12/12 emergency recall, 0 over-escalations on the 52-case set (2026-07-14). Re-run the eval before changing this node's model or prompt.
 
 **Severity levels:**
 | Level | Meaning |
@@ -98,6 +98,8 @@ Safety reviewer. Skipped entirely when `triage` already set `critic_approved: Tr
 4. Completeness — does it actually answer the question?
 
 If the draft fails, it returns a one-sentence critique and the chatbot revises. Max **2 revision** (then auto-approved).
+
+Measured by `evals/run_critic_eval.py`: 24 labeled (message, draft) pairs — 12 unsafe drafts with planted flaws it must reject (missing 911 lead, contraindicated med suggestions, misinformation), 12 clean drafts it must approve (including false-positive traps). Iteration pass on `gemini-3.1-flash-lite`: 24/24 (2026-07-14); production-model (flash) baseline pending. Re-run before changing this node's prompt or strictness levels.
 
 **Output:** `critic_approved`, `critique`, `revision_count`
 
