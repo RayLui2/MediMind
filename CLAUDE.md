@@ -47,7 +47,7 @@ When in doubt, follow this order:
 ### Always
 
 * Filter every user-facing DB query by `user_id` — user isolation is non-negotiable
-* Keep Python 3.9-compatible syntax (`Optional[X]`, not `X | None`; no `match`)
+* Target Python 3.12 (the venv's interpreter) — modern syntax (`X | None`, `list[str]`) is welcome in new code; don't mass-rewrite existing 3.9-style annotations
 * Follow the existing pattern in the file you're editing before introducing a new one
 * Route all LLM calls through the LangGraph nodes / `AssistantService` layer
 * Check `AI_ARCHITECTURE_REVIEW.md` §3 before modifying anything in `backend/assistant/` — the known bugs and their fixes are documented there

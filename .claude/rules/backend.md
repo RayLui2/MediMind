@@ -13,7 +13,7 @@ SQLAlchemy + PostgreSQL = persistence.
 
 ```bash
 cd backend
-source venv/bin/activate                # Python 3.12 venv (rebuilt 2026-07; code still targets 3.9 syntax)
+source venv/bin/activate                # Python 3.12 venv (rebuilt 2026-07; 3.12 is also the syntax baseline)
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -76,7 +76,7 @@ Adding a new env var → also add it to the README env template.
 
 ## Python constraints
 
-* Target Python 3.9: `Optional[X]` / `Union[X, Y]`, never `X | Y`; no `match` statements
+* Target Python 3.12 (the venv's interpreter) — modern syntax (`X | None`, `list[str]`, `match`) is fine in new code; leave existing 3.9-style annotations alone rather than mass-rewriting them (baseline moved from 3.9 on 2026-07-14)
 * Async: routes and graph nodes are `async def`; use `ainvoke`/`astream_events` for LLM calls in async context
 
 ---
