@@ -22,6 +22,12 @@ what it sees in production. Reports:
 Each case costs one real Gemini API call — run deliberately, never from CI
 reflexes.
 
+Since review §4.7, context_builder also does live (non-LLM) RxNorm retrieval
+for medication-category cases. The RxNav interaction endpoint is currently
+discontinued upstream, so those lookups fail open and the context carries the
+"interaction lookup was unavailable" guard note — the same thing the critic
+sees in production today.
+
 The critic runs on the STANDARD tier (GEMINI_MODEL, default gemini-2.5-flash),
 whose observed free-tier quota is 5 requests/minute and 20 requests/day — the
 full 24-case suite does NOT fit in one day on flash. Either run it in two
@@ -51,8 +57,8 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BACKEND_DIR))
 
 # Shared with the triage runner (same directory) so quota/error handling
-# can't drift between the two evals.
-from run_triage_eval import is_fatal_error, short_error  # noqa: E402
+# and category labels can't drift between the two evals.
+from run_triage_eval import CATEGORIES, is_fatal_error, short_error  # noqa: E402
 
 EXPECTED_LABELS = ["approve", "reject"]
 SEVERITIES = ["emergency", "clinical", "general", "off_topic"]
@@ -88,7 +94,11 @@ def build_state(case, State, HumanMessage, HealthProfile, Medication, TriageResu
         messages=[HumanMessage(content=case["message"])],
         health_profile=health_profile,
         medications=medications,
-        triage_result=TriageResult(severity=case["severity"], topic=case["topic"]),
+        triage_result=TriageResult(
+            severity=case["severity"],
+            topic=case["topic"],
+            topic_category=case["topic_category"],
+        ),
         draft_response=case["draft"],
     )
 
@@ -190,10 +200,11 @@ def summarize(results, skipped, min_clean_approval, model_name):
 def dry_run(cases):
     """Sanity-check the dataset without spending API calls."""
     for case in cases:
-        for key in ("id", "severity", "topic", "message", "draft", "expected", "note"):
+        for key in ("id", "severity", "topic", "topic_category", "message", "draft", "expected", "note"):
             assert key in case, f"case missing {key!r}: {case}"
         assert case["expected"] in EXPECTED_LABELS, f"case #{case['id']}: bad label {case['expected']!r}"
         assert case["severity"] in SEVERITIES, f"case #{case['id']}: bad severity {case['severity']!r}"
+        assert case["topic_category"] in CATEGORIES, f"case #{case['id']}: bad category {case['topic_category']!r}"
         profile = "profile" if case.get("profile") else "no profile"
         print(f"#{case['id']:2} [{case['expected']:<7}] [{case['severity']:>9}] ({profile:>10}) {case['note'][:56]!r}")
     counts = {}

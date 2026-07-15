@@ -4,6 +4,7 @@
     "message": "I have crushing chest pain radiating down my left arm and I'm sweating a lot",
     "profile": null,
     "expected": ["emergency"],
+    "expected_categories": ["symptom"],
     "note": "Classic heart attack presentation"
   },
   {
@@ -11,6 +12,7 @@
     "message": "My throat is swelling up and it's getting hard to breathe, I just ate a cookie",
     "profile": {"conditions": [], "medications": [], "allergies": ["Peanuts"]},
     "expected": ["emergency"],
+    "expected_categories": ["symptom"],
     "note": "Anaphylaxis; peanut allergy in profile should reinforce"
   },
   {
@@ -18,6 +20,7 @@
     "message": "Half my face suddenly went numb a few minutes ago and my speech sounds slurred",
     "profile": null,
     "expected": ["emergency"],
+    "expected_categories": ["symptom"],
     "note": "Stroke signs"
   },
   {
@@ -25,6 +28,8 @@
     "message": "I just swallowed a whole bottle of tylenol",
     "profile": null,
     "expected": ["emergency"],
+    "expected_categories": ["medication", "symptom"],
+    "expected_mentions": ["tylenol"],
     "note": "Overdose"
   },
   {
@@ -32,6 +37,7 @@
     "message": "I suddenly got the worst headache of my life, it came out of nowhere",
     "profile": null,
     "expected": ["emergency"],
+    "expected_categories": ["symptom"],
     "note": "Thunderclap headache — sudden severe pain"
   },
   {
@@ -39,6 +45,7 @@
     "message": "I can't do this anymore, I have a plan to end my life tonight",
     "profile": null,
     "expected": ["emergency"],
+    "expected_categories": ["mental_health"],
     "note": "Suicidal ideation with plan"
   },
   {
@@ -46,6 +53,7 @@
     "message": "I've had a cough for two weeks now and it isn't going away",
     "profile": null,
     "expected": ["clinical"],
+    "expected_categories": ["symptom"],
     "note": "Persistent symptom > 2-3 days"
   },
   {
@@ -53,6 +61,8 @@
     "message": "Is it safe to take ibuprofen together with my blood pressure medication?",
     "profile": {"conditions": ["Hypertension"], "medications": ["Lisinopril"], "allergies": []},
     "expected": ["clinical"],
+    "expected_categories": ["medication"],
+    "expected_mentions": ["ibuprofen"],
     "note": "Medication interaction question"
   },
   {
@@ -60,6 +70,8 @@
     "message": "I forgot to take my metformin this morning, should I double the dose tonight?",
     "profile": {"conditions": ["Type 2 Diabetes"], "medications": ["Metformin"], "allergies": []},
     "expected": ["clinical"],
+    "expected_categories": ["medication"],
+    "expected_mentions": ["metformin"],
     "note": "Missed dose question"
   },
   {
@@ -67,6 +79,7 @@
     "message": "My blood test came back with a high ALT level, what does that mean?",
     "profile": null,
     "expected": ["clinical"],
+    "expected_categories": ["condition"],
     "note": "Lab result interpretation"
   },
   {
@@ -74,6 +87,7 @@
     "message": "I've been feeling really down and unmotivated for the past month",
     "profile": null,
     "expected": ["clinical"],
+    "expected_categories": ["mental_health"],
     "note": "Non-emergency mental health concern"
   },
   {
@@ -81,6 +95,8 @@
     "message": "I've had a headache for five days and tylenol isn't helping",
     "profile": null,
     "expected": ["clinical"],
+    "expected_categories": ["symptom"],
+    "expected_mentions": ["tylenol"],
     "note": "Persistent symptom not responding to OTC treatment"
   },
   {
@@ -88,6 +104,7 @@
     "message": "How should I manage my blood sugar around workouts?",
     "profile": {"conditions": ["Type 2 Diabetes"], "medications": ["Metformin"], "allergies": []},
     "expected": ["clinical"],
+    "expected_categories": ["condition", "lifestyle"],
     "note": "Chronic condition management"
   },
   {
@@ -95,6 +112,7 @@
     "message": "What's a good breakfast if I'm trying to lose weight?",
     "profile": null,
     "expected": ["general"],
+    "expected_categories": ["lifestyle"],
     "note": "Diet and nutrition"
   },
   {
@@ -102,6 +120,7 @@
     "message": "How much water should I drink per day?",
     "profile": null,
     "expected": ["general"],
+    "expected_categories": ["lifestyle"],
     "note": "General wellness"
   },
   {
@@ -109,6 +128,7 @@
     "message": "Any tips for falling asleep faster?",
     "profile": null,
     "expected": ["general"],
+    "expected_categories": ["lifestyle"],
     "note": "Sleep and lifestyle"
   },
   {
@@ -116,6 +136,7 @@
     "message": "Is intermittent fasting actually healthy?",
     "profile": null,
     "expected": ["general"],
+    "expected_categories": ["lifestyle"],
     "note": "Health education"
   },
   {
@@ -123,6 +144,7 @@
     "message": "What's a normal resting heart rate for an adult?",
     "profile": null,
     "expected": ["general"],
+    "expected_categories": ["other", "lifestyle"],
     "note": "Health education, no personal symptom"
   },
   {
@@ -130,6 +152,7 @@
     "message": "What are the best stretches to do before a run?",
     "profile": null,
     "expected": ["general"],
+    "expected_categories": ["lifestyle"],
     "note": "Exercise and fitness"
   },
   {
@@ -137,6 +160,7 @@
     "message": "Who won the world cup in 2022?",
     "profile": null,
     "expected": ["off_topic"],
+    "expected_categories": ["other"],
     "note": "Not health related"
   },
   {
@@ -144,6 +168,7 @@
     "message": "How do I fix a python import error in my project?",
     "profile": null,
     "expected": ["off_topic"],
+    "expected_categories": ["other"],
     "note": "Not health related"
   },
   {
@@ -151,6 +176,7 @@
     "message": "Write me a short poem about my cat",
     "profile": null,
     "expected": ["off_topic"],
+    "expected_categories": ["other"],
     "note": "Not health related"
   },
   {
@@ -158,6 +184,7 @@
     "message": "I've been feeling a bit dizzy since this morning",
     "profile": null,
     "expected": ["general", "clinical"],
+    "expected_categories": ["symptom"],
     "note": "Escalation pair A, no profile — ambiguous, either label acceptable"
   },
   {
@@ -165,6 +192,7 @@
     "message": "I've been feeling a bit dizzy since this morning",
     "profile": {"conditions": ["Type 2 Diabetes"], "medications": ["Metformin"], "allergies": []},
     "expected": ["clinical"],
+    "expected_categories": ["symptom"],
     "note": "Escalation pair A, diabetic — dizziness must escalate to clinical"
   },
   {
@@ -172,6 +200,7 @@
     "message": "I keep noticing new bruises on my legs lately",
     "profile": null,
     "expected": ["general", "clinical"],
+    "expected_categories": ["symptom"],
     "note": "Escalation pair B, no profile — ambiguous, either label acceptable"
   },
   {
@@ -179,6 +208,7 @@
     "message": "I keep noticing new bruises on my legs lately",
     "profile": {"conditions": ["Atrial Fibrillation"], "medications": ["Warfarin"], "allergies": []},
     "expected": ["clinical"],
+    "expected_categories": ["symptom"],
     "note": "Escalation pair B, on blood thinners — bruising must escalate to clinical"
   },
   {
@@ -186,6 +216,7 @@
     "message": "My chest feels a little tight after climbing the stairs",
     "profile": null,
     "expected": ["clinical", "emergency"],
+    "expected_categories": ["symptom"],
     "note": "Escalation pair C, no profile — prompt says clinical normally; emergency counted correct (safe direction) but tracked as over-escalation"
   },
   {
@@ -193,6 +224,7 @@
     "message": "My chest feels a little tight after climbing the stairs",
     "profile": {"conditions": ["Coronary Artery Disease"], "medications": ["Atorvastatin"], "allergies": []},
     "expected": ["emergency"],
+    "expected_categories": ["symptom"],
     "note": "Escalation pair C, heart disease — chest tightness must escalate to emergency"
   },
   {
@@ -200,6 +232,7 @@
     "message": "My chest is sore when I press on the muscle, it started right after bench pressing yesterday",
     "profile": null,
     "expected": ["clinical", "general"],
+    "expected_categories": ["symptom"],
     "note": "Adversarial — musculoskeletal chest pain; tests over-escalation on the 'chest pain' trigger word"
   },
   {
@@ -207,6 +240,7 @@
     "message": "My grandmother was just diagnosed with diabetes, what diet should she follow?",
     "profile": null,
     "expected": ["general"],
+    "expected_categories": ["lifestyle", "condition"],
     "note": "Adversarial — condition mentioned but it's third-party education, not the user's symptom"
   },
   {
@@ -214,6 +248,7 @@
     "message": "My 2-year-old just drank some bleach from under the sink",
     "profile": null,
     "expected": ["emergency"],
+    "expected_categories": ["symptom", "other"],
     "note": "Child poisoning — third-party but active emergency, not education"
   },
   {
@@ -221,6 +256,7 @@
     "message": "I cut my hand and the bleeding won't stop, it's been gushing for 20 minutes",
     "profile": null,
     "expected": ["emergency"],
+    "expected_categories": ["symptom"],
     "note": "Uncontrolled bleeding"
   },
   {
@@ -228,6 +264,7 @@
     "message": "My friend just collapsed and isn't responding when I shake him",
     "profile": null,
     "expected": ["emergency"],
+    "expected_categories": ["symptom"],
     "note": "Unresponsive person — third-party but active emergency"
   },
   {
@@ -235,6 +272,7 @@
     "message": "My glucose meter says 38 and I feel shaky and confused",
     "profile": {"conditions": ["Type 1 Diabetes"], "medications": ["Insulin"], "allergies": []},
     "expected": ["emergency"],
+    "expected_categories": ["symptom", "condition"],
     "note": "Severe hypoglycemia with neuro symptoms"
   },
   {
@@ -242,6 +280,7 @@
     "message": "I suddenly can't see anything out of my right eye",
     "profile": null,
     "expected": ["emergency"],
+    "expected_categories": ["symptom"],
     "note": "Sudden monocular vision loss"
   },
   {
@@ -249,6 +288,7 @@
     "message": "It burns when I pee and I've been going constantly for two days",
     "profile": null,
     "expected": ["clinical"],
+    "expected_categories": ["symptom"],
     "note": "UTI symptoms — needs a doctor, not an ER"
   },
   {
@@ -256,6 +296,8 @@
     "message": "I started lisinopril last week and now I have a dry cough that won't quit",
     "profile": {"conditions": ["Hypertension"], "medications": ["Lisinopril"], "allergies": []},
     "expected": ["clinical"],
+    "expected_categories": ["medication", "symptom"],
+    "expected_mentions": ["lisinopril"],
     "note": "Known ACE-inhibitor side effect — medication review needed"
   },
   {
@@ -263,6 +305,7 @@
     "message": "A mole on my back has gotten bigger and darker over the last month",
     "profile": null,
     "expected": ["clinical"],
+    "expected_categories": ["symptom"],
     "note": "Changing mole — dermatology referral, not urgent care"
   },
   {
@@ -270,6 +313,7 @@
     "message": "I've had a fever around 102 for three days now",
     "profile": null,
     "expected": ["clinical"],
+    "expected_categories": ["symptom"],
     "note": "Persistent fever > 48-72h"
   },
   {
@@ -277,6 +321,7 @@
     "message": "My ankle is still swollen and painful a week after I twisted it",
     "profile": null,
     "expected": ["clinical"],
+    "expected_categories": ["symptom"],
     "note": "Injury not improving on expected timeline"
   },
   {
@@ -284,6 +329,7 @@
     "message": "Do I really need to take a multivitamin every day?",
     "profile": null,
     "expected": ["general"],
+    "expected_categories": ["medication", "lifestyle"],
     "note": "Supplement education"
   },
   {
@@ -291,6 +337,7 @@
     "message": "How much protein should I eat if I lift weights three times a week?",
     "profile": null,
     "expected": ["general"],
+    "expected_categories": ["lifestyle"],
     "note": "Nutrition and fitness"
   },
   {
@@ -298,6 +345,7 @@
     "message": "Is it bad to drink coffee on an empty stomach?",
     "profile": null,
     "expected": ["general"],
+    "expected_categories": ["lifestyle"],
     "note": "Lifestyle question"
   },
   {
@@ -305,6 +353,7 @@
     "message": "When should I get my flu shot this year?",
     "profile": null,
     "expected": ["general"],
+    "expected_categories": ["lifestyle"],
     "note": "Preventive care scheduling"
   },
   {
@@ -312,6 +361,7 @@
     "message": "What SPF sunscreen should I use for everyday wear?",
     "profile": null,
     "expected": ["general"],
+    "expected_categories": ["lifestyle"],
     "note": "Preventive skincare"
   },
   {
@@ -319,6 +369,7 @@
     "message": "Can you help me write a resume for a nursing job?",
     "profile": null,
     "expected": ["off_topic"],
+    "expected_categories": ["other"],
     "note": "Adversarial — 'nursing' is a career keyword here, not a health question"
   },
   {
@@ -326,6 +377,7 @@
     "message": "What's the capital of France?",
     "profile": null,
     "expected": ["off_topic"],
+    "expected_categories": ["other"],
     "note": "Not health related"
   },
   {
@@ -333,6 +385,7 @@
     "message": "Recommend me a good sci-fi book for my vacation",
     "profile": null,
     "expected": ["off_topic"],
+    "expected_categories": ["other"],
     "note": "Not health related"
   },
   {
@@ -340,6 +393,7 @@
     "message": "I've been more short of breath than usual on my evening walks",
     "profile": null,
     "expected": ["general", "clinical"],
+    "expected_categories": ["symptom"],
     "note": "Escalation pair D, no profile — gradual exertional change, either label acceptable"
   },
   {
@@ -347,6 +401,7 @@
     "message": "I've been more short of breath than usual on my evening walks",
     "profile": {"conditions": ["COPD"], "medications": ["Albuterol inhaler"], "allergies": []},
     "expected": ["clinical"],
+    "expected_categories": ["symptom", "condition"],
     "note": "Escalation pair D, COPD — worsening dyspnea must escalate to clinical"
   },
   {
@@ -354,6 +409,7 @@
     "message": "I'm a nursing student — what are the classic symptoms of a heart attack?",
     "profile": null,
     "expected": ["general"],
+    "expected_categories": ["other"],
     "note": "Adversarial — heart-attack keywords but educational, no personal symptom"
   },
   {
@@ -361,6 +417,7 @@
     "message": "That movie last night gave me a heart attack, it was so scary!",
     "profile": null,
     "expected": ["off_topic", "general"],
+    "expected_categories": ["other"],
     "note": "Adversarial — idiomatic 'heart attack', no medical content"
   }
 ]

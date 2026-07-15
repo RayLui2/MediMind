@@ -16,6 +16,13 @@ reports:
                          but too many = alarm fatigue and slow critic-gated
                          responses for harmless questions)
   - a confusion table  — expected (primary label) vs predicted
+  - topic-category accuracy and mention extraction — REPORT-ONLY (no gate
+                         until a baseline exists): predicted topic_category
+                         in the case's expected_categories set; extracted
+                         mentioned_medications match expected_mentions
+                         (case-insensitive) on the cases that label them.
+                         These drive retrieval routing (review §4.7), not
+                         safety gating.
 
 Each case costs one real Gemini API call — run deliberately, never from CI
 reflexes.
@@ -51,6 +58,10 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BACKEND_DIR))
 
 SEVERITIES = ["emergency", "clinical", "general", "off_topic"]
+
+# Legal expected_categories labels. 'unclassified' is deliberately absent:
+# it is reserved for the triage-error fallback and must never be a label.
+CATEGORIES = ["medication", "symptom", "condition", "mental_health", "lifestyle", "other"]
 
 # Substring of the quota_id in Gemini's 429 payload that identifies the
 # per-DAY quota (vs the per-minute one, which recovers on its own).
@@ -124,20 +135,29 @@ async def run_eval(cases, delay):
             await asyncio.sleep(delay)
         state = build_state(case, State, HumanMessage, HealthProfile, Medication)
         predicted = None
+        category = None
+        mentions = None
         error = None
         fatal = False
         try:
             out = await triage_node(state)
-            predicted = out["triage_result"].severity
+            triage_result = out["triage_result"]
+            predicted = triage_result.severity
+            category = triage_result.topic_category
+            mentions = triage_result.mentioned_medications
         except Exception as exc:  # a failed call is a recorded error, not a crash
             error = short_error(exc)
             fatal = is_fatal_error(exc)
         ok = predicted in case["expected"]
-        results.append({"case": case, "predicted": predicted, "ok": ok, "error": error})
+        results.append({
+            "case": case, "predicted": predicted, "ok": ok, "error": error,
+            "category": category, "mentions": mentions,
+        })
 
         status = "PASS" if ok else ("ERROR" if error else "FAIL")
         got = predicted if predicted else "-"
-        print(f"[{i + 1:2}/{len(cases)}] {status:5}  expected {'/'.join(case['expected']):<19} got {got:<10} {case['message'][:58]!r}")
+        got_category = category if category else "-"
+        print(f"[{i + 1:2}/{len(cases)}] {status:5}  expected {'/'.join(case['expected']):<19} got {got:<10} [{got_category}] {case['message'][:58]!r}")
 
         if fatal:
             skipped = len(cases) - (i + 1)
@@ -176,10 +196,21 @@ def summarize(results, skipped, min_accuracy, model_name):
     print()
     print(f"=== Triage eval — model: {model_name} ===")
     print(f"Completed        : {len(completed)}/{attempted + skipped} attempted={attempted} errors={len(errors)} skipped={skipped}")
+    # Topic-category + mention metrics — REPORT-ONLY, not part of the gate
+    category_hits = [r for r in completed if r["category"] in r["case"]["expected_categories"]]
+    mention_cases = [r for r in completed if "expected_mentions" in r["case"]]
+    mention_hits = [
+        r for r in mention_cases
+        if {m.lower() for m in (r["mentions"] or [])} == {m.lower() for m in r["case"]["expected_mentions"]}
+    ]
+
     if completed:
         print(f"Accuracy         : {passed}/{len(completed)} ({accuracy:.0%}) over completed cases   [gate: >= {min_accuracy:.0%}]")
         print(f"Emergency recall : {caught}/{len(emergencies)} ({recall:.0%}) over completed cases   [gate: 100%]")
         print(f"Over-escalations : {len(over_escalations)} (non-emergency labeled emergency)")
+        print(f"Category accuracy: {len(category_hits)}/{len(completed)} ({len(category_hits) / len(completed):.0%})   [report-only]")
+        if mention_cases:
+            print(f"Mention extract  : {len(mention_hits)}/{len(mention_cases)} exact (case-insensitive)   [report-only]")
     else:
         print("No completed cases — nothing to score.")
 
@@ -200,6 +231,19 @@ def summarize(results, skipped, min_accuracy, model_name):
             print(f"  #{case['id']:2} expected {'/'.join(case['expected'])}, got {r['predicted']}")
             print(f"      message: {case['message']!r}")
             print(f"      note:    {case['note']}")
+
+    category_misses = [r for r in completed if r["category"] not in r["case"]["expected_categories"]]
+    if category_misses:
+        print("\nCategory mismatches (report-only):")
+        for r in category_misses:
+            case = r["case"]
+            print(f"  #{case['id']:2} expected {'/'.join(case['expected_categories'])}, got {r['category']}  {case['message'][:58]!r}")
+    mention_misses = [r for r in mention_cases if r not in mention_hits]
+    if mention_misses:
+        print("\nMention-extraction mismatches (report-only):")
+        for r in mention_misses:
+            case = r["case"]
+            print(f"  #{case['id']:2} expected {case['expected_mentions']}, got {r['mentions']}")
     if errors:
         print("\nAPI errors (not scored):")
         for r in errors:
@@ -214,12 +258,16 @@ def summarize(results, skipped, min_accuracy, model_name):
 def dry_run(cases):
     """Sanity-check the dataset without spending API calls."""
     for case in cases:
-        for key in ("id", "message", "expected", "note"):
+        for key in ("id", "message", "expected", "expected_categories", "note"):
             assert key in case, f"case missing {key!r}: {case}"
         for label in case["expected"]:
             assert label in SEVERITIES, f"case #{case['id']}: bad label {label!r}"
+        for label in case["expected_categories"]:
+            assert label in CATEGORIES, f"case #{case['id']}: bad category {label!r}"
+        for mention in case.get("expected_mentions", []):
+            assert isinstance(mention, str) and mention, f"case #{case['id']}: bad mention {mention!r}"
         profile = "profile" if case.get("profile") else "no profile"
-        print(f"#{case['id']:2} [{'/'.join(case['expected']):<19}] ({profile:>10}) {case['message'][:58]!r}")
+        print(f"#{case['id']:2} [{'/'.join(case['expected']):<19}] [{'/'.join(case['expected_categories']):<20}] ({profile:>10}) {case['message'][:58]!r}")
     primary_counts = {}
     for case in cases:
         primary = case["expected"][0]

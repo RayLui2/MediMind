@@ -64,7 +64,18 @@ def generate_system_prompt(health_profile: HealthProfile, medications: list[Medi
   - Allergies: {', '.join(allergies) or 'none'}
 
   Also identify the medical topic of the message in 2-5 words (e.g. "chest pain", "medication dosage", "diet
-  advice")."""
+  advice").
+
+  Classify the message into exactly one topic category:
+  - medication — dosages, side effects, interactions, missed doses, supplements
+  - symptom — something the user is feeling or experiencing now
+  - condition — existing diagnoses, chronic disease management, lab results
+  - mental_health — mood, anxiety, mental wellbeing
+  - lifestyle — diet, exercise, sleep, stress, prevention
+  - other — anything else, including off-topic messages
+
+  Finally, list any medications explicitly named in the message (prescription drugs, over-the-counter
+  medicines, or supplements). Use the name as written; leave the list empty if none are named."""
 
 def create_triage_node():
     llm = get_llm(temperature=0.05, streaming=False, tier="fast")
@@ -89,8 +100,14 @@ def create_triage_node():
             # Fail toward safety: an unclassified message must never be treated
             # as harmless. 'clinical' keeps the critic in the loop and makes the
             # chatbot recommend professional evaluation; 'general' would bypass both.
+            # topic_category='unclassified' additionally makes context_builder run
+            # the medication interaction lookup — the question might be about meds.
             logger.exception("triage failed — escalating severity to 'clinical'")
-            return {"triage_result": TriageResult(severity="clinical", topic="unclassified (triage error)")}
+            return {"triage_result": TriageResult(
+                severity="clinical",
+                topic="unclassified (triage error)",
+                topic_category="unclassified",
+            )}
 
         logger.info(f"triage_result: {response}")
 
