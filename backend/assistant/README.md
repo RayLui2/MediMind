@@ -59,7 +59,13 @@ Runs in parallel with `triage`. Generates a short conversation title (≤ 6 word
 **Output:** `conversation_title`
 
 ### `triage` *(parallel branch)*
-Classifies the urgency and topic of the user's message. Uses the user's health profile (conditions, medications, allergies) to escalate severity when relevant. Runs on the fast model tier (`GEMINI_MODEL_FAST`), validated by `evals/run_triage_eval.py` — 98% accuracy (51/52), 12/12 emergency recall, 0 over-escalations on the 52-case set (2026-07-14). Re-run the eval before changing this node's model or prompt.
+Classifies the urgency and topic of the user's message. Uses the user's health profile (conditions, medications, allergies) to escalate severity when relevant. Runs on the fast model tier (`GEMINI_MODEL_FAST`), validated by `evals/run_triage_eval.py` — 100% accuracy (52/52), 12/12 emergency recall, 0 over-escalations on the 52-case set (`gemini-3.1-flash-lite`, 2026-07-14, re-baselined after the §4.7 schema extension below). Re-run the eval before changing this node's model or prompt.
+
+Besides `severity` and the free-text `topic`, the structured output includes two fields that drive retrieval (review §4.7):
+- `topic_category` — one of `medication` / `symptom` / `condition` / `mental_health` / `lifestyle` / `other`; read by `context_builder` to decide what to retrieve. (`unclassified` is a seventh value reserved for the error fallback — the LLM is instructed never to use it.)
+- `mentioned_medications` — drugs/supplements explicitly named in the message, so interaction lookups can cover a drug the user is asking about but not yet taking.
+
+The eval reports topic-category accuracy and mention extraction as additional metrics (report-only, no gate yet). First baseline (2026-07-14): category accuracy 52/52, mention extraction 4/5 — the one miss is benign: the model included a *profile* medication in `mentioned_medications` (it sees the med list in its prompt's health context), which is a downstream no-op since `context_builder` merges profile meds into the lookup anyway and dedupes.
 
 **Severity levels:**
 | Level | Meaning |
@@ -71,12 +77,23 @@ Classifies the urgency and topic of the user's message. Uses the user's health p
 
 For `general` and `off_topic` messages, `critic_approved` is set to `True` immediately (skips the critic loop).
 
-**Failure policy (fail toward safety):** if the triage LLM call errors, the node returns `severity: clinical` (topic `"unclassified (triage error)"`) — never `general` — so the critic stays in the loop and the chatbot recommends professional evaluation.
+**Failure policy (fail toward safety):** if the triage LLM call errors, the node returns `severity: clinical` (topic `"unclassified (triage error)"`, `topic_category: unclassified`) — never `general` — so the critic stays in the loop and the chatbot recommends professional evaluation. The `unclassified` category additionally makes `context_builder` run the medication interaction lookup over the user's med list: the unclassified question *might* be about medications.
 
 **Output:** `triage_result`, optionally `critic_approved: True`
 
 ### `context_builder`
-Builds a personalized health context string from the user's profile. Includes all available data — conditions, allergies, medications, and vitals.
+Builds a personalized health context string from the user's profile — conditions, allergies, medications, and vitals — then performs **topic-driven retrieval** based on `triage_result.topic_category` (review §4.7). The result flows to both the chatbot and the critic, so retrieved material is always part of the evidence the critic reviews.
+
+Current retrieval routes (`assistant/retrieval.py`):
+| Category | Retrieval |
+|---|---|
+| `medication` | RxNorm + openFDA: resolve the user's active meds **+** `mentioned_medications` to ingredient names (RxNorm, so "Advil" matches "ibuprofen"), then scan each drug's FDA-label `drug_interactions` section for mentions of the others |
+| `unclassified` (triage errored) | Same lookup over the user's med list only (fail-safe — the question might be medication-related) |
+| everything else | None yet (condition/symptom retrieval is future work) |
+
+**Failure policy (fail open):** retrieval is an enhancement, not a safety gate. Any lookup error is logged and the turn proceeds — with a guard note in the context ("interaction lookup was unavailable — do not state that interactions were checked") so the chatbot can't imply a check happened. Clinical/emergency turns remain critic-gated regardless.
+
+> **Source note:** NLM discontinued the RxNav drug-interaction endpoint in 2024 with no official replacement, so interactions come from openFDA drug-label `drug_interactions` text (swapped 2026-07-14). Matching is name-level: a label that only says "NSAIDs" won't flag ibuprofen — the context section states this limitation instead of implying a complete check, and the no-hit wording tells the user to confirm with a pharmacist.
 
 **Output:** `retrieved_context`
 
@@ -128,7 +145,7 @@ Defined in `state.py` as a Pydantic `BaseModel`. Key fields:
 | `health_profile` | `HealthProfile` | Conditions, allergies, family history, etc. |
 | `vital_signs` | `VitalSign` | Latest recorded vitals |
 | `medications` | `list[Medication]` | Active medications |
-| `triage_result` | `TriageResult` | Severity + topic from triage node |
+| `triage_result` | `TriageResult` | Severity, topic, topic_category, mentioned_medications |
 | `retrieved_context` | `str` | Assembled health context string |
 | `draft_response` | `str` | Chatbot's current draft |
 | `critic_approved` | `bool` | Whether critic approved the draft |
@@ -144,10 +161,11 @@ Defined in `state.py` as a Pydantic `BaseModel`. Key fields:
 assistant/
 ├── graph.py              # Graph definition and compilation
 ├── state.py              # LangGraph State (Pydantic)
+├── retrieval.py          # RxNorm + openFDA lookups for topic-driven retrieval
 ├── nodes/
 │   ├── fanout            # (inline in graph.py)
 │   ├── triage.py         # Urgency + topic classifier
-│   ├── context_builder.py# Retrieves relevant health context
+│   ├── context_builder.py# Formats profile context + topic-driven retrieval
 │   ├── chatbot.py        # Main response generator
 │   ├── critic.py         # Safety reviewer
 │   ├── streaming.py      # Commit node — appends the final AIMessage
@@ -155,7 +173,7 @@ assistant/
 │   └── recommendations.py# Recommendations node (used by graphs/recommendations.py)
 ├── models/
 │   ├── critic.py         # CriticResult (approved, critique)
-│   ├── triage.py         # TriageResult (severity, topic)
+│   ├── triage.py         # TriageResult (severity, topic, topic_category, mentioned_medications)
 │   ├── health_profile.py
 │   ├── vital_sign.py
 │   ├── medications.py
