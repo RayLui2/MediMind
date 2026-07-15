@@ -1,40 +1,16 @@
 # Standard library
 import logging
 
-# Third-party
-import requests
-
 # Local
+from assistant.retrieval import fetch_medication_context
 from assistant.state import State
 
 logger = logging.getLogger(__name__)
 
-def get_rxcui_by_string(medications):
-    base_url = "https://rxnav.nlm.nih.gov/REST/rxcui.json"
-    rxcuis_list = []
-    
-    try:
-        for medicine in medications:
-            params = {'name': medicine.name}
-            response = requests.get(base_url, params=params)
-            response.raise_for_status() # Raise exception for HTTP errors
-            data = response.json()
-            
-            # Parse the JSON response
-            id_group = data.get('idGroup', {})
-            rxcuis = id_group.get('rxnormId', [])
-            
-            if rxcuis:
-                rxcuis_list.append(rxcuis[0])
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error fetching data: {e}")
-        return None
-
-    return rxcuis_list
-
-def get_medication_interaction_flags(rxcuis_list):
-    # TODO Contact one of the reputable clinical API providers: FDB (First Databank) MedKnowledge, Wolters Kluwer (Medi-Span), or Certara (DIDB)
-    return []
+RETRIEVAL_UNAVAILABLE_NOTE = (
+    "Note: medication interaction lookup was unavailable for this turn — "
+    "do not state that interactions were checked."
+)
 
 def create_context_builder_node():
     async def context_builder(state: State):
@@ -44,9 +20,6 @@ def create_context_builder_node():
         vital_signs = state.vital_signs
 
         retrieved_context = "" # Initialize retrieved_context as an empty string
-
-        # rxcuis_list = get_rxcui_by_string(medications=medications)
-        # medication_interaction_flags = get_medication_interaction_flags(rxcuis_list) # TODO: Implement this
 
         triage = state.triage_result
         if not triage:
@@ -59,7 +32,7 @@ def create_context_builder_node():
             user_info = f"""User information:
 - Name: {name}
 - Age: {age}"""
-            
+
             retrieved_context = user_info
 
         # Build retrieved_context from sections
@@ -75,7 +48,7 @@ def create_context_builder_node():
             parts.append(f"Active Medical Conditions: {', '.join(conditions)}")
         if allergies:
             parts.append(f"Known Allergies: {', '.join(allergies)}")
-        
+
         # Medications
         med_lines = []
         if medications:
@@ -99,8 +72,18 @@ def create_context_builder_node():
                 recorded_str = vital_signs.recorded_at.strftime('%Y-%m-%d') if hasattr(vital_signs.recorded_at, 'strftime') else str(vital_signs.recorded_at)[:10]
                 parts.append(f"Recent Vitals (recorded {recorded_str}): {', '.join(vitals_lines)}")
 
+        # Topic-driven retrieval: interaction data for medication questions.
+        # 'unclassified' means triage errored — the question MIGHT be about
+        # medications, so include the user's own meds just in case (fail-safe).
+        if triage.topic_category in ("medication", "unclassified"):
+            lookup_names = [m.name for m in medications if m.name] if medications else []
+            if triage.topic_category == "medication":
+                lookup_names += triage.mentioned_medications
+            section = await fetch_medication_context(lookup_names)
+            parts.append(section if section else RETRIEVAL_UNAVAILABLE_NOTE)
+
         retrieved_context += "\n".join(parts)
-        
+
         logger.debug(f"retrieved_context: {retrieved_context}")
         return {"retrieved_context": retrieved_context}
 
